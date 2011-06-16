@@ -1,5 +1,6 @@
 __author__ = 'Tom'
 
+import socket
 from cards import *
 
 class PokerPlayer(Hand):
@@ -32,6 +33,20 @@ class Poker:
 class Server:
     def __init__(self):
         self.poker = Poker()
-        for i in range(8):
-            self.poker.add_player(i)
-  
+        self.start_server()
+
+    def start_server(self):
+        HOST = ''                 # Symbolic name meaning all available interfaces
+        PORT = 50007              # Arbitrary non-privileged port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((HOST, PORT))
+        s.listen(1)
+        conn, addr = s.accept()
+        #print('Connected by', addr)
+        while 1:
+            data = conn.recv(1024)
+            if not data: break
+            if data == "add" and len(self.poker.players) < 8:
+                self.poker.add_player(len(self.poker.players))
+            #conn.send(data)
+        conn.close()

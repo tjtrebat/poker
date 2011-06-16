@@ -1,7 +1,6 @@
 __author__ = 'Tom'
 
 import socket
-from server import *
 from tkinter import *
 from tkinter.ttk import *
 
@@ -39,15 +38,16 @@ class PokerGUI:
                 #self.canvas.itemconfig(self.images[player][-1], image=self.cards[player.cards[-1]])
         #self.bet = Scale(self.root, from_=0, to=)
 
+    def get_position(self, position):
+        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
+        return positions[position]
+
     def connect_to_server(self):
         HOST = socket.gethostname()    # The remote host
         PORT = 50007              # The same port as used by the server
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.connect((HOST, PORT))
-
-    def get_position(self, position):
-        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
-        return positions[position]
+        self.server.send("add")
 
 if __name__ == "__main__":
     root = Tk()

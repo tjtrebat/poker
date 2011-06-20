@@ -12,10 +12,11 @@ class PlayerThread(Thread):
 
     def run(self):
         while True:
-            data = self.player.conn.recv(1024).decode("UTF-8")
-            if data == "quit":
-                self.player.poker.players.remove(self.player)
-
+            if self.player in self.player.poker.players:
+                data = self.player.conn.recv(1024).decode("UTF-8")
+                if data == "quit":
+                    self.player.quit()
+                
 class PokerPlayer(Hand):
     def __init__(self, id, conn, poker):
         super(PokerPlayer, self).__init__()
@@ -24,6 +25,10 @@ class PokerPlayer(Hand):
         self.poker = poker
         self.thread = PlayerThread(self)
         self.thread.start()
+
+    def quit(self):
+        self.poker.players.remove(self)
+        self.conn.close()
 
 class LobbyThread(Thread):
     def __init__(self, poker):
@@ -53,7 +58,6 @@ class Poker:
         self.lobby = LobbyThread(self)
         self.lobby.start()
         self.has_started = False
-
 
     def deal_card(self, player):
         player.add(self.deck.cards.pop())

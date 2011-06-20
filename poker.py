@@ -52,12 +52,11 @@ class PokerGUI:
         PORT = 50007              # The same port as used by the server
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.connect((HOST, PORT))
-        self.server.send(bytes("add", "UTF-8"))
-        while True:
-            data = self.server.recv(8000)
-            print(pickle.loads(data))
-            #pickle.loads(data)
-            #print()
+        self.server.send(bytes("add_player", "UTF-8"))
+        #while True:
+        #    data = self.server.recv(8000)
+        #    if not data: break
+        #    print(pickle.loads(data))
 
 if __name__ == "__main__":
     root = Tk()

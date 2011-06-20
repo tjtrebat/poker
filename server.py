@@ -7,6 +7,7 @@ from cards import *
 class PokerPlayer(Hand):
     def __init__(self):
         super(PokerPlayer, self).__init__()
+        self.conn = None
         self.chips = 500
 
     #def __hash__(self):
@@ -34,6 +35,7 @@ class Server:
     def __init__(self):
         self.poker = Poker()
         self.run_server()
+        self.new_game()
 
     def run_server(self):
         HOST = ''                 # Symbolic name meaning all available interfaces
@@ -41,15 +43,18 @@ class Server:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((HOST, PORT))
         s.listen(1)
-        while 1:
-            conn, addr = s.accept()
-            print('Connected by', addr)
+        while len(self.poker.players) < 8:
+            conn, address = s.accept()
+            print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
             if not data: break
-            if data == "add" and len(self.poker.players) < 8:
+            if data == "add_player":
                 self.poker.add_player()
-                conn.send(pickle.dumps(self.poker))
-        conn.close()
+                self.poker.players[-1].conn = (conn, address,)
+            conn.close()
+            
+    def new_game(self):
+        pass
 
 if __name__ == "__main__":
     server = Server()

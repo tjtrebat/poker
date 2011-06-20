@@ -3,41 +3,35 @@ __author__ = 'Tom'
 import socket
 import pickle
 from cards import *
+from threading import Thread
+
+class PlayerThread(Thread):
+    def __init__(self, player):
+        Thread.__init__(self)
+        self.player = player
+
+    def run(self):
+        while True:
+            data = self.player.conn.recv(1024).decode("UTF-8")
+            if data == "quit":
+                self.player.poker.players.remove(self.player)
 
 class PokerPlayer(Hand):
-    def __init__(self):
+    def __init__(self, id, conn, poker):
         super(PokerPlayer, self).__init__()
-        self.conn = None
-        self.chips = 500
+        self.id = id
+        self.conn = conn
+        self.poker = poker
+        self.thread = PlayerThread(self)
+        self.thread.start()
 
-    #def __hash__(self):
-    #    return hash(self.index)
+class LobbyThread(Thread):
+    def __init__(self, poker):
+        Thread.__init__(self)
+        self.poker = poker
+        self.is_full = False
 
-class Poker:
-    def __init__(self):
-        self.deck = Deck(count=2)
-        self.deck.shuffle()
-        self.players = []
-
-    def add_player(self):
-        self.players.append(PokerPlayer())
-
-    def deal_card(self, player):
-        player.add(self.deck.cards.pop())
-
-    def __str__(self):
-        s = ""
-        for i, player in enumerate(self.players):
-            s += "Player %d: %s\n" % (i + 1, str(player))
-        return s
-
-class Server:
-    def __init__(self):
-        self.poker = Poker()
-        self.run_server()
-        self.new_game()
-
-    def run_server(self):
+    def run(self):
         HOST = ''                 # Symbolic name meaning all available interfaces
         PORT = 50007              # Arbitrary non-privileged port
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -48,13 +42,27 @@ class Server:
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
             if not data: break
-            if data == "add_player":
-                self.poker.add_player()
-                self.poker.players[-1].conn = (conn, address,)
-            conn.close()
-            
-    def new_game(self):
-        pass
+            self.poker.players.append(PokerPlayer(data, conn, self.poker))
+        self.is_full = True
+
+class Poker:
+    def __init__(self):
+        self.deck = Deck(count=2)
+        self.deck.shuffle()
+        self.players = []
+        self.lobby = LobbyThread(self)
+        self.lobby.start()
+        self.has_started = False
+
+
+    def deal_card(self, player):
+        player.add(self.deck.cards.pop())
+
+    def __str__(self):
+        s = ""
+        for i, player in enumerate(self.players):
+            s += "Player %d: %s\n" % (i + 1, str(player))
+        return s
 
 if __name__ == "__main__":
-    server = Server()
+    poker = Poker()

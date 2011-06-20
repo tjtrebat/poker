@@ -1,7 +1,8 @@
 __author__ = 'Tom'
 
+import uuid
 import socket
-import pickle
+#import pickle
 from server import *
 from tkinter import *
 from tkinter.ttk import *
@@ -11,9 +12,12 @@ class PokerGUI:
         self.root = root
         self.root.title("Poker")
         self.root.geometry("800x550")
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
         self.canvas = Canvas(self.root, width=800, height=500)
         self.canvas.pack(fill='both', expand='yes')
         #self.face_down_image = PhotoImage(file="cards/b1fv.gif")
+        self.player_id = uuid.uuid4()
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect_to_server()
         #self.cards = {}
         #for card in self.server.poker.deck.cards:
@@ -50,13 +54,12 @@ class PokerGUI:
     def connect_to_server(self):
         HOST = socket.gethostname()    # The remote host
         PORT = 50007              # The same port as used by the server
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.connect((HOST, PORT))
-        self.server.send(bytes("add_player", "UTF-8"))
-        #while True:
-        #    data = self.server.recv(8000)
-        #    if not data: break
-        #    print(pickle.loads(data))
+        self.server.send(bytes(str(self.player_id), "UTF-8"))
+
+    def quit(self):
+        self.server.send(bytes("quit", "UTF-8"))
+        self.root.destroy()
 
 if __name__ == "__main__":
     root = Tk()

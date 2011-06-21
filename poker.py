@@ -3,61 +3,64 @@ __author__ = 'Tom'
 import uuid
 import socket
 import pickle
-from server import *
+from cards import *
 from tkinter import *
 from tkinter.ttk import *
+from threading import Thread
 
 class PokerGUI(Thread):
     def __init__(self, root):
         Thread.__init__(self)
         self.root = root
         self.root.title("Poker")
-        self.root.geometry("800x550")
+        self.root.geometry("800x560")
+        self.root.resizable(0, 0)
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
         self.canvas = Canvas(self.root, width=800, height=500)
         self.canvas.pack(fill='both', expand='yes')
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
-        self.player_id = uuid.uuid4()
+        self.player_id = str(uuid.uuid4())
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.cards = {}
         for card in Deck():
-            self.cards[card] = PhotoImage(file=card.get_image())
-        self.connect_to_server()
-
-    """
-    def new_game(self):
-        for i in range(2):
-            for player in self.poker.players:
-                self.poker.deal_card(player)
-                position = player.get_position()
-                if i > 0:
-                    if not player.position:
-                        position = (position[0] - 75, position[1])
-                    else:
-                        position = (position[0] - 10, position[1] - 10)
-                if not player.position:
-                    image = self.cards[player.cards[-1]]
-                else:
-                    image = self.face_down_image
-                self.images[player].append(self.canvas.create_image(position, image=image))
-                #self.canvas.itemconfig(self.images[player][-1], image=self.cards[player.cards[-1]])
-        #self.bet = Scale(self.root, from_=0, to=)
-
+            self.cards[str(card)] = PhotoImage(file=card.get_image())
+        self.player_cards = {}
+        self.bet = Scale(self.root, from_=0, to=500)
+        self.bet.pack()
+        self.btn_bet = Button(self.root, text='Bet', state=DISABLED)
+        self.btn_bet.pack()
+        self.start()
 
     def get_position(self, position):
-        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
+        positions = ((50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
         return positions[position]
-    """
-    
-    def connect_to_server(self):
+
+    def new_game(self):
+        data = self.server.recv(1024)
+        players = pickle.loads(data)
+        self.player_cards = {player: [] for player in players}
+        players.remove(self.player_id)
+        data = self.server.recv(1024)
+        cards = pickle.loads(data)
+        self.player_cards[self.player_id].append(self.canvas.create_image((435, 450), image=self.cards[str(cards[0])]))
+        self.player_cards[self.player_id].append(self.canvas.create_image((355, 450), image=self.cards[str(cards[1])]))
+        for i, player in enumerate(players):
+            self.player_cards[player].append(self.canvas.create_image(self.get_position(i), image=self.face_down_image))
+            self.player_cards[player].append(self.canvas.create_image(list(map(lambda x, y: x + y, self.get_position(i), (-10, -10))),
+                                                                          image=self.face_down_image))
+
+    def run(self):
         HOST = socket.gethostname()    # The remote host
         PORT = 50007              # The same port as used by the server
         self.server.connect((HOST, PORT))
-        self.server.send(bytes(str(self.player_id), "UTF-8"))
-        while True:
-            data = self.server.recv(1024)
-            card = pickle.loads(data)
-            print(card)
+        self.server.send(bytes(self.player_id, "UTF-8"))
+        self.new_game()
+        data = self.server.recv(1024).decode("UTF-8")
+        if data == "bet":
+            self.btn_bet.config(state=ACTIVE)
+        elif data == "quit":
+            id = self.server.recv(1024).decode("UTF-8")
+
 
     def quit(self):
         self.server.send(bytes("quit", "UTF-8"))

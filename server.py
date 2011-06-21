@@ -19,6 +19,9 @@ class PokerPlayer(Hand, Thread):
 
     def quit(self):
         self.poker.players.remove(self)
+        for player in self.poker.players:
+            player.conn.send(bytes("quit", "UTF-8"))
+            player.conn.send(bytes(self.id, "UTF-8"))
         self.conn.close()
 
     def run(self):
@@ -42,20 +45,23 @@ class Poker(Thread):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((HOST, PORT))
         s.listen(1)
-        while len(self.players) < 8:
+        while len(self.players) < 3:
             conn, address = s.accept()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
             if not data: break
             self.players.append(PokerPlayer(self, data, conn))
+        conn.send(pickle.dumps([player.id for player in self.players]))
         self.new_game()
 
     def new_game(self):
         for i in range(2):
             for player in self.players:
-                card = self.deck.pop()
+                card = self.deck.cards.pop()
                 player.add(card)
-                player.conn.send(pickle.dumps(card))
+        for player in self.players:
+            player.conn.send(pickle.dumps(player.cards))
+        #self.players[0].conn.send(bytes("bet", "UTF-8"))
 
     def __str__(self):
         s = ""

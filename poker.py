@@ -2,29 +2,27 @@ __author__ = 'Tom'
 
 import uuid
 import socket
-#import pickle
+import pickle
 from server import *
 from tkinter import *
 from tkinter.ttk import *
 
-class PokerGUI:
+class PokerGUI(Thread):
     def __init__(self, root):
+        Thread.__init__(self)
         self.root = root
         self.root.title("Poker")
         self.root.geometry("800x550")
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
         self.canvas = Canvas(self.root, width=800, height=500)
         self.canvas.pack(fill='both', expand='yes')
-        #self.face_down_image = PhotoImage(file="cards/b1fv.gif")
+        self.face_down_image = PhotoImage(file="cards/b1fv.gif")
         self.player_id = uuid.uuid4()
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.cards = {}
+        for card in Deck():
+            self.cards[card] = PhotoImage(file=card.get_image())
         self.connect_to_server()
-        #self.cards = {}
-        #for card in self.server.poker.deck.cards:
-        #    self.cards[card] = PhotoImage(file=card.get_image())
-        #self.images = {player: [] for player in self.server.poker.players}
-        #self.new_game()
-        #print(self.poker)
 
     """
     def new_game(self):
@@ -56,6 +54,10 @@ class PokerGUI:
         PORT = 50007              # The same port as used by the server
         self.server.connect((HOST, PORT))
         self.server.send(bytes(str(self.player_id), "UTF-8"))
+        while True:
+            data = self.server.recv(1024)
+            card = pickle.loads(data)
+            print(card)
 
     def quit(self):
         self.server.send(bytes("quit", "UTF-8"))

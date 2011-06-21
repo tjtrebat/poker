@@ -5,36 +5,36 @@ import pickle
 from cards import *
 from threading import Thread
 
-class PlayerThread(Thread):
-    def __init__(self, player):
+class PokerPlayer(Hand, Thread):
+    def __init__(self, poker, id, conn):
         Thread.__init__(self)
-        self.player = player
-
-    def run(self):
-        while True:
-            if self.player in self.player.poker.players:
-                data = self.player.conn.recv(1024).decode("UTF-8")
-                if data == "quit":
-                    self.player.quit()
-                
-class PokerPlayer(Hand):
-    def __init__(self, id, conn, poker):
         super(PokerPlayer, self).__init__()
+        self.poker = poker
         self.id = id
         self.conn = conn
-        self.poker = poker
-        self.thread = PlayerThread(self)
-        self.thread.start()
+        self.start()
+
+    def is_playing(self):
+        return (self in self.poker.players)
 
     def quit(self):
         self.poker.players.remove(self)
         self.conn.close()
 
-class LobbyThread(Thread):
-    def __init__(self, poker):
+    def run(self):
+        while True:
+            if self.is_playing():
+                data = self.conn.recv(1024).decode("UTF-8")
+                if data == "quit":
+                    self.quit()
+
+class Poker(Thread):
+    def __init__(self):
         Thread.__init__(self)
-        self.poker = poker
-        self.is_full = False
+        self.deck = Deck(count=2)
+        self.deck.shuffle()
+        self.players = []
+        self.start()
 
     def run(self):
         HOST = ''                 # Symbolic name meaning all available interfaces
@@ -42,25 +42,20 @@ class LobbyThread(Thread):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((HOST, PORT))
         s.listen(1)
-        while len(self.poker.players) < 8:
+        while len(self.players) < 8:
             conn, address = s.accept()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
             if not data: break
-            self.poker.players.append(PokerPlayer(data, conn, self.poker))
-        self.is_full = True
+            self.players.append(PokerPlayer(self, data, conn))
+        self.new_game()
 
-class Poker:
-    def __init__(self):
-        self.deck = Deck(count=2)
-        self.deck.shuffle()
-        self.players = []
-        self.lobby = LobbyThread(self)
-        self.lobby.start()
-        self.has_started = False
-
-    def deal_card(self, player):
-        player.add(self.deck.cards.pop())
+    def new_game(self):
+        for i in range(2):
+            for player in self.players:
+                card = self.deck.pop()
+                player.add(card)
+                player.conn.send(pickle.dumps(card))
 
     def __str__(self):
         s = ""

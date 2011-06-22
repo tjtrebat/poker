@@ -32,22 +32,32 @@ class PokerGUI(Thread):
         self.start()
 
     def get_position(self, position):
-        positions = ((50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
+        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
         return positions[position]
 
     def new_game(self):
-        data = self.server.recv(1024)
-        players = pickle.loads(data)
-        self.player_cards = {player: [] for player in players}
-        players.remove(self.player_id)
-        data = self.server.recv(1024)
-        cards = pickle.loads(data)
-        self.player_cards[self.player_id].append(self.canvas.create_image((435, 450), image=self.cards[str(cards[0])]))
-        self.player_cards[self.player_id].append(self.canvas.create_image((355, 450), image=self.cards[str(cards[1])]))
-        for i, player in enumerate(players):
-            self.player_cards[player].append(self.canvas.create_image(self.get_position(i), image=self.face_down_image))
-            self.player_cards[player].append(self.canvas.create_image(list(map(lambda x, y: x + y, self.get_position(i), (-10, -10))),
-                                                                          image=self.face_down_image))
+        player_position = 1
+        player_data = pickle.loads(self.server.recv(8000))
+        for id, cards in player_data:
+            self.player_cards[id] = []
+            if id == self.player_id:
+                position = self.get_position(0)
+                offset = (-75, 0,)
+                images = [self.cards[str(card)] for card in cards]
+            else:
+                position = self.get_position(player_position)
+                offset = (-10, -10,)
+                images = [self.face_down_image,] * 2
+                player_position += 1
+            self.player_cards[id].append(self.canvas.create_image(position, image=images[0]))
+            self.player_cards[id].append(self.canvas.create_image(list(map(lambda x, y: x + y, position, offset)),
+                                                                  image=images[1]))
+        while True:
+            pass
+            #data = self.server.recv(1024).decode("UTF-8")
+            #data = pickle.loads(data)
+            #if data[0] == "quit":
+            #    pass
 
     def run(self):
         HOST = socket.gethostname()    # The remote host
@@ -55,12 +65,6 @@ class PokerGUI(Thread):
         self.server.connect((HOST, PORT))
         self.server.send(bytes(self.player_id, "UTF-8"))
         self.new_game()
-        data = self.server.recv(1024).decode("UTF-8")
-        if data == "bet":
-            self.btn_bet.config(state=ACTIVE)
-        elif data == "quit":
-            id = self.server.recv(1024).decode("UTF-8")
-
 
     def quit(self):
         self.server.send(bytes("quit", "UTF-8"))

@@ -19,9 +19,9 @@ class PokerPlayer(Hand, Thread):
 
     def quit(self):
         self.poker.players.remove(self)
-        for player in self.poker.players:
-            player.conn.send(bytes("quit", "UTF-8"))
-            player.conn.send(bytes(self.id, "UTF-8"))
+        if self.poker.playing:
+            for player in self.poker.players:
+                player.conn.send(pickle.dumps(("quit", self.id,)))
         self.conn.close()
 
     def run(self):
@@ -37,6 +37,7 @@ class Poker(Thread):
         self.deck = Deck(count=2)
         self.deck.shuffle()
         self.players = []
+        self.playing = False
         self.start()
 
     def run(self):
@@ -51,17 +52,17 @@ class Poker(Thread):
             data = conn.recv(1024).decode("UTF-8")
             if not data: break
             self.players.append(PokerPlayer(self, data, conn))
-        conn.send(pickle.dumps([player.id for player in self.players]))
         self.new_game()
+        self.playing = True
 
     def new_game(self):
         for i in range(2):
             for player in self.players:
-                card = self.deck.cards.pop()
-                player.add(card)
+                player.add(self.deck.cards.pop())
+        player_data = [(player.id, player.cards,) for player in self.players]
+        player_data = pickle.dumps(player_data)
         for player in self.players:
-            player.conn.send(pickle.dumps(player.cards))
-        #self.players[0].conn.send(bytes("bet", "UTF-8"))
+            player.conn.send(player_data)
 
     def __str__(self):
         s = ""

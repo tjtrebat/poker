@@ -19,7 +19,7 @@ class PokerPlayer(Hand, Thread):
 
     def quit(self):
         self.poker.players.remove(self)
-        if self.poker.playing:
+        if self.poker.in_game:
             for player in self.poker.players:
                 player.conn.send(pickle.dumps(("quit", self.id,)))
         self.conn.close()
@@ -27,7 +27,9 @@ class PokerPlayer(Hand, Thread):
     def run(self):
         while True:
             if self.is_playing():
-                data = self.conn.recv(1024).decode("UTF-8")
+                data = self.conn.recv(1024)
+                if not data: break
+                data = data.decode("UTF-8")
                 if data == "quit":
                     self.quit()
 
@@ -37,7 +39,7 @@ class Poker(Thread):
         self.deck = Deck(count=2)
         self.deck.shuffle()
         self.players = []
-        self.playing = False
+        self.in_game = False
         self.start()
 
     def run(self):
@@ -53,7 +55,7 @@ class Poker(Thread):
             if not data: break
             self.players.append(PokerPlayer(self, data, conn))
         self.new_game()
-        self.playing = True
+        self.in_game = True
 
     def new_game(self):
         for i in range(2):

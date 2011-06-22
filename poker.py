@@ -1,5 +1,6 @@
 __author__ = 'Tom'
 
+import sys
 import uuid
 import socket
 import pickle
@@ -12,32 +13,63 @@ class PokerGUI(Thread):
     def __init__(self, root):
         Thread.__init__(self)
         self.root = root
+        self.canvas = Canvas(self.root, width=800, height=500)
+        self.bet = Scale(self.root, from_=0, to=500)
+        self.btn_bet = Button(self.root, text='Bet', state=DISABLED)
+        self.add_widgets()
+
+        self.cards = self.get_cards()
+        self.player_cards = {}
+        self.face_down_image = PhotoImage(file="cards/b1fv.gif")
+
+        self.player_id = str(uuid.uuid4())
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect()
+
+        self.new_game()
+        self.start()
+
+    def add_widgets(self):
         self.root.title("Poker")
         self.root.geometry("800x560")
         self.root.resizable(0, 0)
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
-        self.canvas = Canvas(self.root, width=800, height=500)
         self.canvas.pack(fill='both', expand='yes')
-        self.face_down_image = PhotoImage(file="cards/b1fv.gif")
-        self.player_id = str(uuid.uuid4())
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.cards = {}
-        for card in Deck():
-            self.cards[str(card)] = PhotoImage(file=card.get_image())
-        self.player_cards = {}
-        self.bet = Scale(self.root, from_=0, to=500)
         self.bet.pack()
-        self.btn_bet = Button(self.root, text='Bet', state=DISABLED)
         self.btn_bet.pack()
-        self.start()
 
-    def get_position(self, position):
-        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
-        return positions[position]
+    def get_cards(self):
+        cards = {}
+        deck = Deck()
+        for card in deck:
+            cards[str(card)] = PhotoImage(file=card.get_image())
+        return cards
+
+    def connect(self):
+        HOST = socket.gethostname()    # The remote host
+        PORT = 50007              # The same port as used by the server
+        try:
+            self.server.connect((HOST, PORT))
+        except:
+            sys.exit("Connection refused by remote host.")
+        self.send_data(bytes(self.player_id, "UTF-8"))
+
+    def get_data(self, num_bytes):
+        data = self.server.recv(num_bytes)
+        if not data.strip():
+            sys.exit("Connection refused by remote host.")
+        return data
+            
+    def send_data(self, data):
+        try:
+            self.server.send(data)
+        except:
+            sys.exit("Connection refused by remote host.")
 
     def new_game(self):
         player_position = 1
-        player_data = pickle.loads(self.server.recv(8000))
+        data = self.get_data(8000)
+        player_data = pickle.loads(data)
         for id, cards in player_data:
             self.player_cards[id] = []
             if id == self.player_id:
@@ -52,22 +84,20 @@ class PokerGUI(Thread):
             self.player_cards[id].append(self.canvas.create_image(position, image=images[0]))
             self.player_cards[id].append(self.canvas.create_image(list(map(lambda x, y: x + y, position, offset)),
                                                                   image=images[1]))
-        while True:
-            pass
-            #data = self.server.recv(1024).decode("UTF-8")
-            #data = pickle.loads(data)
-            #if data[0] == "quit":
-            #    pass
 
+    def get_position(self, position):
+        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
+        return positions[position]
+            
     def run(self):
-        HOST = socket.gethostname()    # The remote host
-        PORT = 50007              # The same port as used by the server
-        self.server.connect((HOST, PORT))
-        self.server.send(bytes(self.player_id, "UTF-8"))
-        self.new_game()
+        while True:
+            data = self.get_data(1024)
+            data = pickle.loads(data)
+            if data[0] == "quit":
+                print(data[1])
 
     def quit(self):
-        self.server.send(bytes("quit", "UTF-8"))
+        self.send_data(bytes("quit", "UTF-8"))
         self.root.destroy()
 
 if __name__ == "__main__":

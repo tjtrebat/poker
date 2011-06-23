@@ -4,10 +4,10 @@ import sys
 import uuid
 import socket
 import pickle
-from cards import *
+from threading import Thread
 from tkinter import *
 from tkinter.ttk import *
-from threading import Thread
+from cards import *
 
 class PokerGUI(Thread):
     def __init__(self, root):
@@ -17,15 +17,13 @@ class PokerGUI(Thread):
         self.bet = Scale(self.root, from_=0, to=500)
         self.btn_bet = Button(self.root, text='Bet', state=DISABLED)
         self.add_widgets()
-
         self.cards = self.get_cards()
         self.player_cards = {}
+        self.player_chips = {}
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
-
         self.player_id = str(uuid.uuid4())
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect()
-
         self.new_game()
         self.start()
 
@@ -42,7 +40,7 @@ class PokerGUI(Thread):
         cards = {}
         deck = Deck()
         for card in deck:
-            cards[str(card)] = PhotoImage(file=card.get_image())
+            cards[hash(card)] = PhotoImage(file=card.get_image())
         return cards
 
     def connect(self):
@@ -55,8 +53,9 @@ class PokerGUI(Thread):
         self.send_data(bytes(self.player_id, "UTF-8"))
 
     def get_data(self, num_bytes):
-        data = self.server.recv(num_bytes)
-        if not data.strip():
+        try:
+            data = self.server.recv(num_bytes)
+        except:
             sys.exit("Connection refused by remote host.")
         return data
             
@@ -72,10 +71,11 @@ class PokerGUI(Thread):
         player_data = pickle.loads(data)
         for id, cards in player_data:
             self.player_cards[id] = []
+            self.player_chips[id] = None
             if id == self.player_id:
                 position = self.get_position(0)
                 offset = (-75, 0,)
-                images = [self.cards[str(card)] for card in cards]
+                images = [self.cards[hash(card)] for card in cards]
             else:
                 position = self.get_position(player_position)
                 offset = (-10, -10,)
@@ -94,7 +94,10 @@ class PokerGUI(Thread):
             data = self.get_data(1024)
             data = pickle.loads(data)
             if data[0] == "quit":
-                print(data[1])
+                for card in self.player_cards[data[1]]:
+                    self.canvas.delete(card)
+            elif data[0] == "chips":
+                self.player_chips[data[2]] = data[1]
 
     def quit(self):
         self.send_data(bytes("quit", "UTF-8"))

@@ -12,11 +12,16 @@ class PokerPlayer(Hand, Thread):
         self.poker = poker
         self.id = id
         self.conn = conn
+        self.chips = 50
         self.start()
 
     def is_playing(self):
         return (self in self.poker.players)
 
+    def bet(self, amount):
+        self.chips -= amount
+        self.conn.send(pickle.dumps(("chips", self.chips, self.id,)))
+    
     def quit(self):
         self.poker.players.remove(self)
         if self.poker.in_game:
@@ -40,6 +45,7 @@ class Poker(Thread):
         self.deck.shuffle()
         self.players = []
         self.in_game = False
+        self.player_turn = 0
         self.start()
 
     def run(self):
@@ -56,6 +62,11 @@ class Poker(Thread):
             self.players.append(PokerPlayer(self, data, conn))
         self.new_game()
         self.in_game = True
+        while True:
+            self.players[self.player_turn].bet(1)
+            self.player_turn = (self.player_turn + 1) % len(self.players)
+            self.players[self.player_turn].bet(2)
+            break
 
     def new_game(self):
         for i in range(2):
@@ -65,6 +76,8 @@ class Poker(Thread):
         player_data = pickle.dumps(player_data)
         for player in self.players:
             player.conn.send(player_data)
+            player.bet(0)
+
 
     def __str__(self):
         s = ""

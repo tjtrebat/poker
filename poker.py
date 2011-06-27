@@ -92,12 +92,17 @@ class PokerGUI(Thread):
     def run(self):
         while True:
             data = self.get_data(1024)
+            print("here")
+            if not data: break
             data = pickle.loads(data)
             if data[0] == "quit":
                 for card in self.player_cards[data[1]]:
                     self.canvas.delete(card)
             elif data[0] == "chips":
-                self.player_chips[data[2]] = data[1]
+                self.player_chips[self.player_id] = data[1]
+            elif data[0] == "turn":
+                self.btn_bet.config(state=ACTIVE)
+            print(data)
 
     def quit(self):
         self.send_data(bytes("quit", "UTF-8"))

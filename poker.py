@@ -9,6 +9,17 @@ from tkinter import *
 from tkinter.ttk import *
 from cards import *
 
+class Player:
+    def __init__(self, root, id):
+        self.id = id
+        self.canvas = Canvas(root, width=145, height=115)
+        self.cards = []
+        self.chips = None
+        self.num_chips = 0
+
+    def __str__(self):
+        return self.id
+
 class PokerGUI(Thread):
     def __init__(self, root):
         Thread.__init__(self)
@@ -20,11 +31,9 @@ class PokerGUI(Thread):
         self.btn_bet = Button(self.player_frame, text='Bet', state=DISABLED)
         self.add_widgets()
         self.cards = self.get_cards()
-        self.player_cards = {}
-        self.player_chips = {}
-        self.num_player_chips = {}
+        self.player = Player(self.canvas, str(uuid.uuid4()))
+        self.players = [self.player,]
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
-        self.player_id = str(uuid.uuid4())
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect()
         self.new_game()
@@ -55,7 +64,7 @@ class PokerGUI(Thread):
             self.server.connect((HOST, PORT))
         except:
             sys.exit("Remote host hung up unexpectedly.")
-        self.send_data(bytes(self.player_id, "UTF-8"))
+        self.send_data(bytes(self.player.id, "UTF-8"))
 
     def get_data(self, num_bytes):
         try:
@@ -75,8 +84,13 @@ class PokerGUI(Thread):
         data = self.get_data(8000)
         player_data = pickle.loads(data)
         for id, cards, chips in player_data:
-            self.player_cards[id] = []
-            if id == self.player_id:
+            self.players.append(Player(self.canvas, id, cards, num_chips=chips))
+
+
+
+
+
+            if id == self.player.id:
                 position = self.get_position(0)
                 offset = (-75, 0,)
                 images = [self.cards[hash(card)] for card in cards]

@@ -9,13 +9,12 @@ from tkinter import *
 from tkinter.ttk import *
 from cards import *
 
-class Player:
+class PlayerCanvas:
     def __init__(self, root, id):
         self.id = id
         self.canvas = Canvas(root, width=145, height=115)
         self.cards = []
         self.chips = None
-        self.num_chips = 0
 
     def __str__(self):
         return self.id
@@ -31,7 +30,7 @@ class PokerGUI(Thread):
         self.btn_bet = Button(self.player_frame, text='Bet', state=DISABLED)
         self.add_widgets()
         self.cards = self.get_cards()
-        self.player = Player(self.canvas, str(uuid.uuid4()))
+        self.player = PlayerCanvas(self.canvas, str(uuid.uuid4()))
         self.players = [self.player,]
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -46,9 +45,9 @@ class PokerGUI(Thread):
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
         self.canvas.pack(fill='both', expand='yes')
         self.player_frame.pack()
-        self.bet.pack()
-        self.lbl_bet.pack(side='left')
-        self.btn_bet.pack(side='right')
+        self.bet.grid(row=0, column=0)
+        self.lbl_bet.grid(row=0, column=1)
+        self.btn_bet.grid()
 
     def get_cards(self):
         cards = {}
@@ -66,18 +65,17 @@ class PokerGUI(Thread):
                 images = [self.cards[hash(card)] for card in cards]
                 self.bet.config(to=int(chips))
             else:
-                player = Player(self.canvas, id)
+                player = PlayerCanvas(self.canvas, id)
                 images = [self.face_down_image,] * 2
                 self.players.append(player)
             for i, image in enumerate(images):
                 player.cards.append(player.canvas.create_image(5 + 70 * i, 50, image=image, anchor=W))
-            player.num_chips = chips
-            player.chips = player.canvas.create_text(75, 110, text="Chips: %s" % player.num_chips)
+            player.chips = player.canvas.create_text(75, 110, text="Chips: %s" % chips)
         for i, player in enumerate(self.players):
             self.canvas.create_window(self.get_position(i), window=player.canvas)
 
     def get_position(self, position):
-        positions = ((405, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
+        positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[position]
 
     def get_player(self, id):
@@ -103,10 +101,9 @@ class PokerGUI(Thread):
                 self.players.remove(player)
             elif data[0] == "chips":
                 player = self.get_player(data[1])
-                player.num_chips = data[2]
-                player.canvas.itemconfig(player.chips, text="Chips: %s" % player.num_chips)
+                player.canvas.itemconfig(player.chips, text="Chips: %s" % data[2])
                 if player == self.player:
-                    self.bet.config(to=int(player.num_chips))
+                    self.bet.config(to=int(data[2]))
             elif data[0] == "turn":
                 self.btn_bet.config(state=ACTIVE)
             print(data)

@@ -58,28 +58,6 @@ class PokerGUI(Thread):
             cards[hash(card)] = PhotoImage(file=card.get_image())
         return cards
 
-    def connect(self):
-        HOST = socket.gethostname()    # The remote host
-        PORT = 50007              # The same port as used by the server
-        try:
-            self.server.connect((HOST, PORT))
-        except:
-            sys.exit("Remote host hung up unexpectedly.")
-        self.send_data(bytes(self.player.id, "UTF-8"))
-
-    def get_data(self, num_bytes):
-        try:
-            data = self.server.recv(num_bytes)
-        except:
-            sys.exit("Remote host hung up unexpectedly.")
-        return data
-            
-    def send_data(self, data):
-        try:
-            self.server.send(data)
-        except:
-            sys.exit("Remote host hung up unexpectedly.")
-
     def new_game(self):
         data = self.get_data(8000)
         player_data = pickle.loads(data)
@@ -103,9 +81,18 @@ class PokerGUI(Thread):
         positions = ((405, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[position]
 
-    def get_position_offset(self, position, offset):
-        return list(map(lambda x, y: x + y, position, offset))
-            
+    def get_player(self, id):
+        for player in self.players:
+            if id == player.id:
+                return player
+
+    def scale_bet(self, bet):
+        self.lbl_bet.config(text=int(float(bet)))
+
+    def quit(self):
+        self.send_data(bytes("quit", "UTF-8"))
+        self.root.destroy()
+
     def run(self):
         while True:
             data = self.get_data(1024)
@@ -125,17 +112,27 @@ class PokerGUI(Thread):
                 self.btn_bet.config(state=ACTIVE)
             print(data)
 
-    def get_player(self, id):
-        for player in self.players:
-            if id == player.id:
-                return player
+    def connect(self):
+        HOST = socket.gethostname()    # The remote host
+        PORT = 50007              # The same port as used by the server
+        try:
+            self.server.connect((HOST, PORT))
+        except:
+            sys.exit("Remote host hung up unexpectedly.")
+        self.send_data(bytes(self.player.id, "UTF-8"))
 
-    def scale_bet(self, bet):
-        self.lbl_bet.config(text=int(float(bet)))
+    def get_data(self, num_bytes):
+        try:
+            data = self.server.recv(num_bytes)
+        except:
+            sys.exit("Remote host hung up unexpectedly.")
+        return data
 
-    def quit(self):
-        self.send_data(bytes("quit", "UTF-8"))
-        self.root.destroy()
+    def send_data(self, data):
+        try:
+            self.server.send(data)
+        except:
+            sys.exit("Remote host hung up unexpectedly.")
 
 if __name__ == "__main__":
     root = Tk()

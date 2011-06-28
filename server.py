@@ -22,7 +22,8 @@ class PokerPlayer(Hand, Thread):
 
     def bet(self, amount):
         self.chips -= amount
-        self.send_data(("chips", self.chips,))
+        for player in self.poker.players:
+            player.send_data(("chips", self.id, self.chips,))
     
     def quit(self):
         self.poker.players.remove(self)
@@ -66,7 +67,7 @@ class Poker(Thread):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((HOST, PORT))
         s.listen(1)
-        while len(self.players) < 8:
+        while len(self.players) < 2:
             conn, address = s.accept()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")

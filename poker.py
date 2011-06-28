@@ -13,6 +13,7 @@ class Player:
     def __init__(self, root, id):
         self.id = id
         self.canvas = Canvas(root, width=145, height=115)
+        self.window = None
         self.cards = []
         self.chips = None
         self.num_chips = 0
@@ -80,34 +81,26 @@ class PokerGUI(Thread):
             sys.exit("Remote host hung up unexpectedly.")
 
     def new_game(self):
-        player_position = 1
         data = self.get_data(8000)
         player_data = pickle.loads(data)
         for id, cards, chips in player_data:
-            self.players.append(Player(self.canvas, id, cards, num_chips=chips))
-
-
-
-
-
             if id == self.player.id:
-                position = self.get_position(0)
-                offset = (-75, 0,)
+                player = self.player
                 images = [self.cards[hash(card)] for card in cards]
+                self.bet.config(to=int(chips))
             else:
-                position = self.get_position(player_position)
-                offset = (-10, -10,)
+                player = Player(self.canvas, id)
                 images = [self.face_down_image,] * 2
-                player_position += 1
-            self.player_cards[id].append(self.canvas.create_image(position, image=images[0]))
-            self.player_cards[id].append(self.canvas.create_image(self.get_position_offset(position, offset),
-                                                                  image=images[1]))
-            self.player_chips[id] = self.canvas.create_text(self.get_position_offset(position, (-25, 65,)), text=chips)
-            self.num_player_chips[id] = int(chips)
-            self.bet.config(to=int(chips))
+                self.players.append(player)
+            for i, image in enumerate(images):
+                player.cards.append(player.canvas.create_image(5 + 70 * i, 50, image=image, anchor=W))
+            player.num_chips = chips
+            player.chips = player.canvas.create_text(75, 110, text="Chips: %s" % player.num_chips)
+        for i, player in enumerate(self.players):
+            player.window = self.canvas.create_window(self.get_position(i), window=player.canvas)
 
     def get_position(self, position):
-        positions = ((435, 450), (50, 450), (50, 250), (50, 60), (400, 60), (750, 60), (750, 250), (750, 450),)
+        positions = ((405, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[position]
 
     def get_position_offset(self, position, offset):
@@ -119,15 +112,23 @@ class PokerGUI(Thread):
             if not data: break
             data = pickle.loads(data)
             if data[0] == "quit":
-                for card in self.player_cards[data[1]]:
-                    self.canvas.delete(card)
+                player = self.get_player(data[1])
+                player.canvas.delete(ALL)
+                self.players.remove(player)
             elif data[0] == "chips":
-                self.canvas.itemconfig(self.player_chips[self.player_id], text=data[1])
-                self.num_player_chips[self.player_id] = int(data[1])
-                self.bet.config(to=int(data[1]))
+                player = self.get_player(data[1])
+                player.num_chips = data[2]
+                player.canvas.itemconfig(player.chips, text="Chips: %s" % player.num_chips)
+                if player == self.player:
+                    self.bet.config(to=int(player.num_chips))
             elif data[0] == "turn":
                 self.btn_bet.config(state=ACTIVE)
             print(data)
+
+    def get_player(self, id):
+        for player in self.players:
+            if id == player.id:
+                return player
 
     def scale_bet(self, bet):
         self.lbl_bet.config(text=int(float(bet)))

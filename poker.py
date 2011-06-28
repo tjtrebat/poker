@@ -13,7 +13,6 @@ class Player:
     def __init__(self, root, id):
         self.id = id
         self.canvas = Canvas(root, width=145, height=115)
-        self.window = None
         self.cards = []
         self.chips = None
         self.num_chips = 0
@@ -75,7 +74,7 @@ class PokerGUI(Thread):
             player.num_chips = chips
             player.chips = player.canvas.create_text(75, 110, text="Chips: %s" % player.num_chips)
         for i, player in enumerate(self.players):
-            player.window = self.canvas.create_window(self.get_position(i), window=player.canvas)
+            self.canvas.create_window(self.get_position(i), window=player.canvas)
 
     def get_position(self, position):
         positions = ((405, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)

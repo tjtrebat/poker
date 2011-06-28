@@ -1,5 +1,6 @@
 __author__ = 'Tom'
 
+import sys
 import socket
 import pickle
 from threading import *
@@ -35,7 +36,10 @@ class PokerPlayer(Hand, Thread):
 
     def send_data(self, data):
         self.event.wait(1)
-        self.conn.send(pickle.dumps(data))
+        try:
+            self.conn.send(pickle.dumps(data))
+        except:
+            sys.exit("Remote host hung up unexpectedly.")
 
     def run(self):
         while True:
@@ -62,7 +66,7 @@ class Poker(Thread):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((HOST, PORT))
         s.listen(1)
-        while len(self.players) < 1:
+        while len(self.players) < 8:
             conn, address = s.accept()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
@@ -84,11 +88,9 @@ class Poker(Thread):
         for i in range(2):
             for player in self.players:
                 player.add(self.deck.cards.pop())
-        player_data = [(player.id, player.cards,) for player in self.players]
-        player_data = pickle.dumps(player_data)
+        player_data = [(player.id, player.cards, player.chips,) for player in self.players]
         for player in self.players:
-            player.conn.send(player_data)
-            player.bet(0)
+            player.send_data(player_data)
 
     def __str__(self):
         s = ""

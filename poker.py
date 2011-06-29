@@ -9,6 +9,7 @@ if __name__ == "__main__":
     HOST, PORT = "localhost", 9999
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((HOST, PORT))
+    sock.send(bytes("add", "UTF-8"))
     #while True:
     #    data = sock.recv(1024).decode("UTF-8")
     #    if not data: break

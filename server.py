@@ -13,12 +13,28 @@ class Poker:
         self.deck = Deck(count=2)
         self.deck.shuffle()
         self.players = []
+        self.in_lobby = True
 
-    def new_game(self):
+class PokerServer(socketserver.StreamRequestHandler):
+    def __init__(self, request, client_address, server):
+
+        super(Poker, self).__init__(request, client_address, server)
+
+    def deal_cards(self):
         for i in range(2):
             for player in self.players:
                 card = self.deck.cards.pop()
                 player.add(card)
+
+    def handle(self):
+        data = self.rfile.readline().decode("UTF-8").strip()
+        if data == "add":
+            print("Adding Player %d" % self.count)
+            self.count += 1
+            #if self.in_lobby:
+
+            #    if len(self.players) > 7:
+            #        self.in_lobby = False
 
     def __str__(self):
         s = ""
@@ -26,16 +42,10 @@ class Poker:
             s += "Player %d: %s\n" % (i + 1, str(player))
         return s
 
-class Lobby(socketserver.BaseRequestHandler):
-    def __init__(self, request, client_address, server):
-        super(Lobby, self).__init__(self, request, client_address, server)
-
 if __name__ == "__main__":
     HOST, PORT = "localhost", 9999
-    server = socketserver.TCPServer((HOST, PORT), Lobby)
-    poker = Poker()
-    while len(poker.players) < 2:
-        poker.players.append(PokerPlayer(server.get_request())
+    server = socketserver.TCPServer((HOST, PORT), Poker)
+    server.serve_forever()
 
 """
 import sys

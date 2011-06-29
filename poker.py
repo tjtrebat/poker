@@ -119,6 +119,8 @@ class PokerGUI(Thread):
             elif data[0] == "turn":
                 self.btn_bet.config(state=ACTIVE)
                 self.btn_fold.config(state=ACTIVE)
+                self.bet.config(from_=data[1])
+                self.lbl_bet.config(text=data[1])
             print(data)
 
     def connect(self):

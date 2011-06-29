@@ -1,7 +1,7 @@
 __author__ = 'Tom'
 
 import sys
-import socket
+import socketserver
 import pickle
 from threading import *
 from cards import *
@@ -14,6 +14,7 @@ class PokerPlayer(Hand, Thread):
         self.id = id
         self.conn = conn
         self.chips = 50
+        self.last_bet = 0
         self.event = Event()
         self.start()
 
@@ -21,12 +22,13 @@ class PokerPlayer(Hand, Thread):
         return (self in self.poker.players)
 
     def bet(self, amount):
-        self.chips -= int(amount)
+        self.chips -= amount
+        self.last_bet = amount
         for player in self.poker.players:
             player.send_data(("chips", self.id, self.chips,))
 
     def turn(self):
-        self.send_data(("turn",))
+        self.send_data(("turn", self.poker.min_bet - self.last_bet,))
 
     def quit(self):
         self.poker.players.remove(self)
@@ -44,7 +46,10 @@ class PokerPlayer(Hand, Thread):
                 if data[0] == "quit":
                     self.quit()
                 elif data[0] == "bet":
-                    self.bet(data[1])
+                    self.poker.min_bet = int(data[1])
+                    self.bet(self.poker.min_bet)
+                    self.poker.player_turn = self.poker.get_next_player()
+                    self.poker.players[self.poker.get_next_player()].turn()
 
     def send_data(self, data):
         self.event.wait(1)
@@ -53,15 +58,22 @@ class PokerPlayer(Hand, Thread):
         except:
             sys.exit("Remote host hung up unexpectedly.")
 
-class Poker(Thread):
+class PokerServer(socketserver.BaseRequestHandler):
+    def handle(self):
+        pass
+
+if __name__ == "__main__":
+
+"""
+class Poker:
     def __init__(self):
-        Thread.__init__(self)
         self.deck = Deck(count=2)
         self.deck.shuffle()
         self.players = []
         self.in_game = False
         self.player_turn = 0
-        self.start()
+        self.min_bet = 2
+        self.server = PokerServer()
 
     def new_game(self):
         for i in range(2):
@@ -74,13 +86,8 @@ class Poker(Thread):
     def get_next_player(self):
         return ((self.player_turn + 1) % len(self.players))
 
-    def run(self):
-        HOST = ''                 # Symbolic name meaning all available interfaces
-        PORT = 50007              # Arbitrary non-privileged port
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((HOST, PORT))
-        s.listen(1)
-        while len(self.players) < 1:
+    def handle(self):
+        while len(self.players) < 3:
             conn, address = s.accept()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
@@ -103,3 +110,4 @@ class Poker(Thread):
 
 if __name__ == "__main__":
     poker = Poker()
+"""

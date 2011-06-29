@@ -21,7 +21,7 @@ class PokerPlayer(Hand, Thread):
         return (self in self.poker.players)
 
     def bet(self, amount):
-        self.chips -= amount
+        self.chips -= int(amount)
         for player in self.poker.players:
             player.send_data(("chips", self.id, self.chips,))
 
@@ -40,9 +40,11 @@ class PokerPlayer(Hand, Thread):
             if self.is_playing():
                 data = self.conn.recv(1024)
                 if not data: break
-                data = data.decode("UTF-8")
-                if data == "quit":
+                data = pickle.loads(data)
+                if data[0] == "quit":
                     self.quit()
+                elif data[0] == "bet":
+                    self.bet(data[1])
 
     def send_data(self, data):
         self.event.wait(1)

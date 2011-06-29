@@ -1,5 +1,43 @@
 __author__ = 'Tom'
 
+import socketserver
+from cards import *
+
+class PokerPlayer(Hand):
+    def __init__(self, socket):
+        super(PokerPlayer, self).__init__()
+        self.socket = socket
+
+class Poker:
+    def __init__(self):
+        self.deck = Deck(count=2)
+        self.deck.shuffle()
+        self.players = []
+
+    def new_game(self):
+        for i in range(2):
+            for player in self.players:
+                card = self.deck.cards.pop()
+                player.add(card)
+
+    def __str__(self):
+        s = ""
+        for i, player in enumerate(self.players):
+            s += "Player %d: %s\n" % (i + 1, str(player))
+        return s
+
+class Lobby(socketserver.BaseRequestHandler):
+    def __init__(self, request, client_address, server):
+        super(Lobby, self).__init__(self, request, client_address, server)
+
+if __name__ == "__main__":
+    HOST, PORT = "localhost", 9999
+    server = socketserver.TCPServer((HOST, PORT), Lobby)
+    poker = Poker()
+    while len(poker.players) < 2:
+        poker.players.append(PokerPlayer(server.get_request())
+
+"""
 import sys
 import socketserver
 import pickle
@@ -62,9 +100,6 @@ class PokerServer(socketserver.BaseRequestHandler):
     def handle(self):
         pass
 
-if __name__ == "__main__":
-
-"""
 class Poker:
     def __init__(self):
         self.deck = Deck(count=2)

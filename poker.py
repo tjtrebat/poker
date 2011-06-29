@@ -1,5 +1,20 @@
 __author__ = 'Tom'
 
+import socket
+from cards import *
+
+
+
+if __name__ == "__main__":
+    HOST, PORT = "localhost", 9999
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((HOST, PORT))
+    #while True:
+    #    data = sock.recv(1024).decode("UTF-8")
+    #    if not data: break
+    #    print(data)
+
+"""
 import sys
 import uuid
 import socket
@@ -149,3 +164,4 @@ if __name__ == "__main__":
     root = Tk()
     gui = PokerGUI(root)
     root.mainloop()
+"""

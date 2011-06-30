@@ -4,9 +4,10 @@ import socketserver
 from cards import *
 
 class PokerPlayer(Hand):
-    def __init__(self, socket):
+    def __init__(self, id, request):
         super(PokerPlayer, self).__init__()
-        self.socket = socket
+        self.id = id
+        self.request = request
 
 class Poker:
     def __init__(self):
@@ -27,14 +28,16 @@ class Poker:
             s += "Player %d: %s\n" % (i + 1, str(player))
         return s
 
-class PokerServer(socketserver.StreamRequestHandler):
+class PokerServer(socketserver.BaseRequestHandler):
     poker = Poker()
 
     def handle(self):
-        data = self.rfile.readline().decode("UTF-8").strip()
-        print(data)
-        if data[0] == "add":
-            print("Adding Player %d" % data[1])
+        data = self.request.recv(1024).decode("UTF-8").strip().split()
+        if data[0] == "add" and self.poker.in_lobby:
+            self.poker.players.append(PokerPlayer(data[1], self.request))
+            self.request.send(bytes("hello!", "UTF-8"))
+            if len(self.poker.players) > 7:
+                self.poker.in_lobby = False
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 9999

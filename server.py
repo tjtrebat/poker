@@ -18,12 +18,14 @@ class PokerPlayer(Hand, Thread):
         self.start()
 
     def is_playing(self):
-        return (self in self.poker.players)
+        return self in self.poker.players
 
     def bet(self, amount):
-        self.chips -= int(amount)
+        self.chips -= amount
+        self.poker.pot += amount
         for player in self.poker.players:
             player.send_data(("chips", self.id, self.chips,))
+            player.send_data(("pot", self.poker.pot,))
 
     def turn(self):
         self.send_data(("turn", self.poker.current_bet))
@@ -44,7 +46,10 @@ class PokerPlayer(Hand, Thread):
                 if data[0] == "quit":
                     self.quit()
                 elif data[0] == "bet":
-                    self.bet(data[1])
+                    self.poker.current_bet = int(data[1])
+                    self.bet(self.poker.current_bet)
+                    self.poker.player_turn = self.poker.get_next_player()
+                    self.poker.players[self.poker.get_next_player()].turn()
 
     def send_data(self, data):
         self.event.wait(1)
@@ -62,6 +67,7 @@ class Poker(Thread):
         self.in_game = False
         self.player_turn = 0
         self.current_bet = 2
+        self.pot = 0
         self.start()
 
     def new_game(self):
@@ -73,7 +79,7 @@ class Poker(Thread):
             player.send_data(player_data)
 
     def get_next_player(self):
-        return ((self.player_turn + 1) % len(self.players))
+        return (self.player_turn + 1) % len(self.players)
 
     def run(self):
         HOST, PORT = socket.gethostname(), 50007

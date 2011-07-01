@@ -25,6 +25,7 @@ class PokerGUI(Thread):
         Thread.__init__(self)
         self.root = root
         self.canvas = Canvas(self.root, width=800, height=520)
+        self.pot = self.canvas.create_text(400, 320, text="Pot: 0")
         self.player_frame = Frame(self.root)
         self.bet = Scale(self.player_frame, from_=0, command=self.scale_bet)
         self.lbl_bet = Label(self.player_frame, text=0)
@@ -119,6 +120,8 @@ class PokerGUI(Thread):
                 player.canvas.itemconfig(player.chips, text="Chips: {}".format(player.chip_total))
                 if player == self.player:
                     self.bet.config(to=int(player.chip_total))
+            elif data[0] == "pot":
+                self.canvas.itemconfig(self.pot, text="Pot: {}".format(data[1]))
             elif data[0] == "turn":
                 min_bet = int(data[1])
                 self.btn_bet.config(state=ACTIVE)

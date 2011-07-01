@@ -62,7 +62,11 @@ class PokerGUI(Thread):
     def new_game(self):
         data = self.get_data(8000)
         player_data = pickle.loads(data)
-        for id, cards, chips in player_data:
+        my_index = [data[0] for data in player_data].index(self.player.id)
+        position = 0
+        index = my_index
+        while position < 8:
+            id, cards, chips = player_data[index]
             if id == self.player.id:
                 player = self.player
                 images = [self.cards[hash(card)] for card in cards]
@@ -70,13 +74,14 @@ class PokerGUI(Thread):
             else:
                 player = PlayerCanvas(self.canvas, id)
                 images = [self.face_down_image,] * 2
-                self.players.append(player)
+                self.players.append(player)                
             for i, image in enumerate(images):
                 player.cards.append(player.canvas.create_image(5 + 70 * i, 50, image=image, anchor=W))
             player.chip_total = int(chips)
             player.chips = player.canvas.create_text(75, 110, text="Chips: {}".format(player.chip_total))
-        for i, player in enumerate(self.players):
-            self.canvas.create_window(self.get_position(i), window=player.canvas)
+            self.canvas.create_window(self.get_position(position), window=player.canvas)
+            index = (index + 1) % 8
+            position += 1
 
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)
@@ -111,14 +116,16 @@ class PokerGUI(Thread):
             elif data[0] == "chips":
                 player = self.get_player(data[1])
                 player.chip_total = int(data[2])
-                player.canvas.itemconfig(player.chips, text="Chips: %d" % player.chip_total)
+                player.canvas.itemconfig(player.chips, text="Chips: {}".format(player.chip_total))
                 if player == self.player:
                     self.bet.config(to=int(player.chip_total))
             elif data[0] == "turn":
+                min_bet = int(data[1])
                 self.btn_bet.config(state=ACTIVE)
                 self.btn_fold.config(state=ACTIVE)
-                self.bet.config(from_=int(data[1]))
-
+                self.bet.config(from_=min_bet)
+                self.bet.set(min_bet)
+                self.lbl_bet.config(text=data[1])
             print(data)
 
     def connect(self):

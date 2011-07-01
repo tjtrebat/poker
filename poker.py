@@ -81,9 +81,7 @@ class PokerGUI(Thread):
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)
         self.btn_fold.config(state=DISABLED)
-        self.lbl_bet.config(text=0)
         self.send_data(("bet", int(self.bet.get()),))
-        self.bet.set(0)
 
     def get_position(self, position):
         positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
@@ -119,11 +117,12 @@ class PokerGUI(Thread):
             elif data[0] == "turn":
                 self.btn_bet.config(state=ACTIVE)
                 self.btn_fold.config(state=ACTIVE)
+                self.bet.config(from_=int(data[1]))
+
             print(data)
 
     def connect(self):
-        HOST = socket.gethostname()    # The remote host
-        PORT = 50007              # The same port as used by the server
+        HOST, PORT = socket.gethostname(), 50007
         try:
             self.server.connect((HOST, PORT))
             self.server.send(bytes(self.player.id, "UTF-8"))

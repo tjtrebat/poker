@@ -98,7 +98,7 @@ class Poker(Thread):
     def __str__(self):
         s = ""
         for i, player in enumerate(self.players):
-            s += "Player %d: %s\n" % (i + 1, str(player))
+            s += "Player {}: {}\n".format(i + 1, str(player))
         return s
 
 if __name__ == "__main__":

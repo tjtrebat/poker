@@ -12,13 +12,13 @@ class Card:
             rank = int(self.rank)
         except ValueError:
             rank = self.rank[0].lower()
-        return 'cards/%s.gif' % (self.suit[0].lower() + str(rank),)
+        return 'cards/{}.gif'.format(self.suit[0].lower() + str(rank))
 
     def __hash__(self):
         return hash(self.rank) ^ hash(self.suit)
 
     def __str__(self):
-        return "%s of %ss" % (self.rank, self.suit)
+        return "{} of {}s".format(self.rank, self.suit)
 
 class Deck:
     def __init__(self, count=1):

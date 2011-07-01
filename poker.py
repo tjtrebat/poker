@@ -74,7 +74,7 @@ class PokerGUI(Thread):
             for i, image in enumerate(images):
                 player.cards.append(player.canvas.create_image(5 + 70 * i, 50, image=image, anchor=W))
             player.chip_total = int(chips)
-            player.chips = player.canvas.create_text(75, 110, text="Chips: %d" % player.chip_total)
+            player.chips = player.canvas.create_text(75, 110, text="Chips: {}".format(player.chip_total))
         for i, player in enumerate(self.players):
             self.canvas.create_window(self.get_position(i), window=player.canvas)
 

@@ -14,6 +14,7 @@ class PokerPlayer(Hand, Thread):
         self.id = id
         self.conn = conn
         self.chips = 50
+        self.last_bet = 0
         self.event = Event()
         self.start()
 
@@ -21,14 +22,15 @@ class PokerPlayer(Hand, Thread):
         return self in self.poker.players
 
     def bet(self, amount):
-        self.chips -= amount
         self.poker.pot += amount
+        self.chips -= amount
+        self.last_bet = amount
         for player in self.poker.players:
             player.send_data(("chips", self.id, self.chips,))
             player.send_data(("pot", self.poker.pot,))
 
     def turn(self):
-        self.send_data(("turn", self.poker.current_bet))
+        self.send_data(("turn", self.poker.current_bet - self.last_bet,))
 
     def quit(self):
         self.poker.players.remove(self)
@@ -46,8 +48,10 @@ class PokerPlayer(Hand, Thread):
                 if data[0] == "quit":
                     self.quit()
                 elif data[0] == "bet":
-                    self.poker.current_bet = int(data[1])
-                    self.bet(self.poker.current_bet)
+                    bet = int(data[1])
+                    if bet > self.poker.current_bet:
+                        self.poker.current_bet = bet
+                    self.bet(bet)
                     self.poker.player_turn = self.poker.get_next_player()
                     self.poker.players[self.poker.get_next_player()].turn()
 

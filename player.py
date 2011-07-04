@@ -4,7 +4,7 @@ import uuid
 from threading import Thread
 from tkinter import *
 from tkinter.ttk import *
-from server import *
+from connection import *
 from cards import *
 
 class PlayerCanvas:
@@ -37,9 +37,10 @@ class PlayerGUI(Thread):
         self.players = [self.player,]
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
         self.num_cards = 0
-        self.conn = Server()
+        self.conn = Connection()
         self.conn.connect()
-        self.conn.send_data(Server.get_bytes(self.player.id))
+        self.conn.data = self.conn.get_bytes(self.player.id)
+        self.conn.send_data()
         self.new_game()
         self.start()
 
@@ -89,7 +90,8 @@ class PlayerGUI(Thread):
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)
         self.btn_fold.config(state=DISABLED)
-        self.conn.send_data(self.conn.get_pickle(("bet", int(self.bet.get()),)))
+        self.conn.data = self.conn.get_pickle(("bet", int(self.bet.get()),))
+        self.conn.send_data()
 
     def get_player(self, id):
         for player in self.players:
@@ -100,7 +102,8 @@ class PlayerGUI(Thread):
         self.lbl_bet.config(text=int(float(bet)))
 
     def quit(self):
-        self.conn.send_data(self.conn.get_pickle(("quit",)))
+        self.conn.data = self.conn.get_pickle(("quit",))
+        self.conn.send_data()
         self.root.destroy()
 
     def run(self):

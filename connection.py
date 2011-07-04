@@ -4,23 +4,22 @@ import sys
 import socket
 import pickle
 
-class Server:
+class Connection:
     def __init__(self, conn=None):
         self.conn = conn or socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.data = None
 
     def connect(self):
-        HOST, PORT = socket.gethostname(), 50007
+        HOST, PORT = "localhost", 50007
         try:
             self.conn.connect((HOST, PORT))
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 
-    @classmethod
-    def get_bytes(cls, data):
+    def get_bytes(self, data):
         return bytes(data, "UTF-8")
 
-    @classmethod
-    def get_pickle(cls, data):
+    def get_pickle(self, data):
         return pickle.dumps(data)
 
     def get_data(self, num_bytes):
@@ -30,9 +29,9 @@ class Server:
             sys.exit("Remote host hung up unexpectedly.")
         return self.load_data(data)
 
-    def send_data(self, data):
+    def send_data(self):
         try:
-            self.conn.send(data)
+            self.conn.send(self.data)
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 

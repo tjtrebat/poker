@@ -1,25 +1,22 @@
 __author__ = 'Tom'
 
-from threading import *
-from server import *
+import socketserver
+from connection import *
 from cards import *
 
-class PokerPlayer(Hand, Thread):
-    def __init__(self, poker, id, conn):
-        Thread.__init__(self)
+class PokerPlayer(Hand):
+    def __init__(self, id, conn):
         super(PokerPlayer, self).__init__()
-        self.poker = poker
         self.id = id
         self.chips = 50
         self.last_bet = 0
         self.has_raised = False
-        self.conn = Server(conn)
-        self.event = Event()
-        self.start()
+        self.conn = Connection(conn)
 
     def is_playing(self):
         return self in self.poker.players
 
+    """
     def run(self):
         while True:
             if self.is_playing():
@@ -37,10 +34,13 @@ class PokerPlayer(Hand, Thread):
                     self.poker.bet(bet)
                     if self.poker.round < 5:
                         self.poker.turn()
+    """
 
-class Poker(Thread):
+class PokerHandler(socketserver.BaseRequestHandler):
+    pass
+
+class Poker:
     def __init__(self):
-        Thread.__init__(self)
         self.deck = Deck()
         self.deck.shuffle()
         self.players = []
@@ -49,17 +49,18 @@ class Poker(Thread):
         self.current_bet = 2
         self.pot = 0
         self.round = 1
-        self.start()
+        self.server = None
+        self.start_lobby()
+        self.new_game()
 
     def new_game(self):
         for i in range(2):
             for player in self.players:
                 player.add(self.deck.pop())
         player_data = [(player.id, player.cards, player.chips,) for player in self.players]
-        player_data = Server.get_pickle(player_data)
         for player in self.players:
-            player.event.wait(1)
-            player.conn.send_data(player_data)
+            player.conn.data = player.conn.get_pickle(player_data)
+            player.conn.send_data()
         self.bet(1)
         self.players[self.player_turn].has_raised = True
         self.bet(2)
@@ -73,10 +74,10 @@ class Poker(Thread):
         self.player_turn = self.get_next_turn()
         if bet:
             for p in self.players:
-                p.event.wait(1)
-                p.conn.send_data(Server.get_pickle(("chips", player.id, player.chips,)))
-                p.event.wait(1)
-                p.conn.send_data(Server.get_pickle(("pot", self.pot,)))
+                p.conn.data = p.conn.get_pickle(("chips", player.id, player.chips,))
+                p.conn.send_data()
+                p.conn.data = p.conn.get_pickle(("pot", self.pot,))
+                p.conn.send_data()
 
     def raise_bet(self, bet):
         self.current_bet = bet
@@ -90,11 +91,10 @@ class Poker(Thread):
             else:
                 num_cards = 3
             data = ("round", [self.deck.pop() for i in range(num_cards)],)
-            data = Server.get_pickle(data)
             for player in self.players:
                 player.last_bet = 0
-                player.event.wait(1)
-                player.conn.send_data(data)
+                player.conn.data = player.conn.get_pickle(data)
+                player.conn.send_data()
             self.current_bet = 0
         self.round += 1
 
@@ -103,31 +103,27 @@ class Poker(Thread):
         player = self.players[self.player_turn]
         if bet > player.last_bet:
             bet -= player.last_bet
-        player.event.wait(1)
-        player.conn.send_data(Server.get_pickle(("turn", bet,)))
+        player.conn.data = player.conn.get_pickle(("turn", bet,))
+        player.conn.send_data()
 
     def quit(self, player):
         self.players.remove(player)
-        if self.in_game:
-            for p in self.players:
-                p.conn.send_data(Server.get_pickle(("quit", player.id,)))
         player.conn.close()
+        for p in self.players:
+            p.conn.data = p.conn.get_pickle(("quit", player.id,))
+            p.conn.send_data()
 
     def get_next_turn(self):
         return (self.player_turn + 1) % len(self.players)
 
-    def run(self):
-        HOST, PORT = socket.gethostname(), 50007
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((HOST, PORT))
-        s.listen(1)
+    def start_lobby(self):
+        HOST, PORT = "localhost", 50007
+        self.server = socketserver.TCPServer((HOST, PORT), PokerHandler)
         while len(self.players) < 8:
-            conn, address = s.accept()
+            conn, address = self.server.get_request()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
-            self.players.append(PokerPlayer(self, data, conn))
-        self.in_game = True
-        self.new_game()
+            self.players.append(PokerPlayer(data, conn))
 
     def __str__(self):
         s = ""

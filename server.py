@@ -5,9 +5,8 @@ import socket
 import pickle
 
 class Server:
-    def __init__(self):
-        self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect()
+    def __init__(self, conn=None):
+        self.conn = conn or socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def connect(self):
         HOST, PORT = socket.gethostname(), 50007
@@ -16,10 +15,12 @@ class Server:
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 
-    def get_bytes(self, data):
+    @classmethod
+    def get_bytes(cls, data):
         return bytes(data, "UTF-8")
 
-    def get_pickle(self, data):
+    @classmethod
+    def get_pickle(cls, data):
         return pickle.dumps(data)
 
     def get_data(self, num_bytes):
@@ -41,3 +42,6 @@ class Server:
         except EOFError:
             sys.exit("Remote host hung up unexpectedly.")
         return data
+
+    def close(self):
+        self.conn.close()

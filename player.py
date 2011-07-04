@@ -4,8 +4,8 @@ import uuid
 from threading import Thread
 from tkinter import *
 from tkinter.ttk import *
-from cards import *
 from server import *
+from cards import *
 
 class PlayerCanvas:
     def __init__(self, root, id):
@@ -37,8 +37,9 @@ class PlayerGUI(Thread):
         self.players = [self.player,]
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
         self.num_cards = 0
-        self.server = Server()
-        self.server.send_data(self.server.get_bytes(self.player.id))
+        self.conn = Server()
+        self.conn.connect()
+        self.conn.send_data(Server.get_bytes(self.player.id))
         self.new_game()
         self.start()
 
@@ -62,7 +63,7 @@ class PlayerGUI(Thread):
         return cards
 
     def new_game(self):
-        player_data = self.server.get_data(4096)
+        player_data = self.conn.get_data(4096)
         my_index = [data[0] for data in player_data].index(self.player.id)
         position = 0
         index = my_index
@@ -88,7 +89,7 @@ class PlayerGUI(Thread):
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)
         self.btn_fold.config(state=DISABLED)
-        self.server.send_data(self.server.get_pickle(("bet", int(self.bet.get()),)))
+        self.conn.send_data(self.conn.get_pickle(("bet", int(self.bet.get()),)))
 
     def get_player(self, id):
         for player in self.players:
@@ -99,12 +100,12 @@ class PlayerGUI(Thread):
         self.lbl_bet.config(text=int(float(bet)))
 
     def quit(self):
-        self.server.send_data(self.server.get_pickle(("quit",)))
+        self.conn.send_data(self.conn.get_pickle(("quit",)))
         self.root.destroy()
 
     def run(self):
         while True:
-            data = self.server.get_data(1024)
+            data = self.conn.get_data(1024)
             if data[0] == "quit":
                 player = self.get_player(data[1])
                 player.canvas.delete(ALL)
@@ -124,6 +125,7 @@ class PlayerGUI(Thread):
                 self.bet.config(from_=min_bet)
                 self.bet.set(min_bet)
                 self.lbl_bet.config(text=data[1])
+                self.root.focus_force()
             elif data[0] == "round":
                 for card in data[1]:
                     self.canvas.create_image(70 * self.num_cards + 255, 240, image=self.cards[hash(card)])

@@ -1,9 +1,7 @@
 __author__ = 'Tom'
 
-import sys
-import socket
-import pickle
 from threading import *
+from server import *
 from cards import *
 
 class PokerPlayer(Hand, Thread):
@@ -12,10 +10,10 @@ class PokerPlayer(Hand, Thread):
         super(PokerPlayer, self).__init__()
         self.poker = poker
         self.id = id
-        self.conn = conn
         self.chips = 50
         self.last_bet = 0
         self.has_raised = False
+        self.conn = Server(conn)
         self.event = Event()
         self.start()
 
@@ -25,7 +23,7 @@ class PokerPlayer(Hand, Thread):
     def run(self):
         while True:
             if self.is_playing():
-                data = self.get_data()
+                data = self.conn.get_data(1024)
                 if data[0] == "quit":
                     self.poker.quit(self)
                 elif data[0] == "bet":
@@ -39,23 +37,6 @@ class PokerPlayer(Hand, Thread):
                     self.poker.bet(bet)
                     if self.poker.round < 5:
                         self.poker.turn()
-
-    def get_data(self):
-        try:
-            data = self.conn.recv(1024)
-        except socket.error:
-            sys.exit("Remote host hung up unexpectedly.")
-        return self.load_data(data)
-
-    def load_data(self, data):
-        return pickle.loads(data)
-                        
-    def send_data(self, data):
-        self.event.wait(1)
-        try:
-            self.conn.send(pickle.dumps(data))
-        except socket.error:
-            sys.exit("Remote host hung up unexpectedly.")
 
 class Poker(Thread):
     def __init__(self):
@@ -75,8 +56,10 @@ class Poker(Thread):
             for player in self.players:
                 player.add(self.deck.pop())
         player_data = [(player.id, player.cards, player.chips,) for player in self.players]
+        player_data = Server.get_pickle(player_data)
         for player in self.players:
-            player.send_data(player_data)
+            player.event.wait(1)
+            player.conn.send_data(player_data)
         self.bet(1)
         self.players[self.player_turn].has_raised = True
         self.bet(2)
@@ -90,8 +73,10 @@ class Poker(Thread):
         self.player_turn = self.get_next_turn()
         if bet:
             for p in self.players:
-                p.send_data(("chips", player.id, player.chips,))
-                p.send_data(("pot", self.pot,))
+                p.event.wait(1)
+                p.conn.send_data(Server.get_pickle(("chips", player.id, player.chips,)))
+                p.event.wait(1)
+                p.conn.send_data(Server.get_pickle(("pot", self.pot,)))
 
     def raise_bet(self, bet):
         self.current_bet = bet
@@ -105,9 +90,11 @@ class Poker(Thread):
             else:
                 num_cards = 3
             data = ("round", [self.deck.pop() for i in range(num_cards)],)
+            data = Server.get_pickle(data)
             for player in self.players:
                 player.last_bet = 0
-                player.send_data(data)
+                player.event.wait(1)
+                player.conn.send_data(data)
             self.current_bet = 0
         self.round += 1
 
@@ -116,13 +103,14 @@ class Poker(Thread):
         player = self.players[self.player_turn]
         if bet > player.last_bet:
             bet -= player.last_bet
-        player.send_data(("turn", bet,))
+        player.event.wait(1)
+        player.conn.send_data(Server.get_pickle(("turn", bet,)))
 
     def quit(self, player):
         self.players.remove(player)
         if self.in_game:
             for p in self.players:
-                p.send_data(("quit", player.id,))
+                p.conn.send_data(Server.get_pickle(("quit", player.id,)))
         player.conn.close()
 
     def get_next_turn(self):
@@ -137,7 +125,6 @@ class Poker(Thread):
             conn, address = s.accept()
             print('Connected by', address)
             data = conn.recv(1024).decode("UTF-8")
-            if not data: break
             self.players.append(PokerPlayer(self, data, conn))
         self.in_game = True
         self.new_game()

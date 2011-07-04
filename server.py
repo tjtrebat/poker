@@ -39,7 +39,8 @@ class PokerPlayer(Hand, Thread):
                         if self.poker.players[self.poker.get_next_turn()].has_raised:
                             self.poker.next_round()
                     self.poker.bet(bet)
-                    self.poker.turn()
+                    if self.poker.round < 5:
+                        self.poker.turn()
 
     def send_data(self, data):
         self.event.wait(1)
@@ -51,7 +52,7 @@ class PokerPlayer(Hand, Thread):
 class Poker(Thread):
     def __init__(self):
         Thread.__init__(self)
-        self.deck = Deck(count=2)
+        self.deck = Deck()
         self.deck.shuffle()
         self.players = []
         self.in_game = False
@@ -78,10 +79,11 @@ class Poker(Thread):
         player = self.players[self.player_turn]
         player.chips -= bet
         player.last_bet = bet
-        for p in self.players:
-            p.send_data(("chips", player.id, player.chips,))
-            p.send_data(("pot", self.pot,))
         self.player_turn = self.get_next_turn()
+        if bet:
+            for p in self.players:
+                p.send_data(("chips", player.id, player.chips,))
+                p.send_data(("pot", self.pot,))
 
     def raise_bet(self, bet):
         self.current_bet = bet
@@ -89,20 +91,24 @@ class Poker(Thread):
             p.has_raised = False
 
     def next_round(self):
-        if self.round > 1:
-            num_cards = 1
-        else:
-            num_cards = 3
+        if self.round < 4:
+            if self.round > 1:
+                num_cards = 1
+            else:
+                num_cards = 3
+            data = ("round", [self.deck.pop() for i in range(num_cards)],)
+            for player in self.players:
+                player.last_bet = 0
+                player.send_data(data)
+            self.current_bet = 0
         self.round += 1
-        data = ("round", [self.deck.pop() for i in range(num_cards)],)
-        for player in self.players:
-            player.last_bet = 0
-            player.send_data(data)
-        self.current_bet = 0
 
     def turn(self):
+        bet = self.current_bet
         player = self.players[self.player_turn]
-        player.send_data(("turn", self.current_bet - player.last_bet,))
+        if bet > player.last_bet:
+            bet -= player.last_bet
+        player.send_data(("turn", bet,))
 
     def quit(self, player):
         self.players.remove(player)
@@ -126,9 +132,7 @@ class Poker(Thread):
             if not data: break
             self.players.append(PokerPlayer(self, data, conn))
         self.in_game = True
-        while True:
-            self.new_game()
-            break
+        self.new_game()
 
     def __str__(self):
         s = ""

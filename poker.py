@@ -1,167 +1,152 @@
 __author__ = 'Tom'
 
 import sys
-import uuid
 import socket
 import pickle
-from threading import Thread
-from tkinter import *
-from tkinter.ttk import *
+from threading import *
 from cards import *
 
-class PlayerCanvas:
-    def __init__(self, root, id):
-        self.id = id
-        self.canvas = Canvas(root, width=145, height=115)
-        self.cards = []
-        self.chips = None
-        self.chip_total = 0
-        self.position = 0
-
-    def get_position(self):
-        positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
-        return positions[self.position]
-
-class PlayerGUI(Thread):
-    def __init__(self, root):
+class PokerPlayer(Hand, Thread):
+    def __init__(self, poker, id, conn):
         Thread.__init__(self)
-        self.root = root
-        self.canvas = Canvas(self.root, width=800, height=520)
-        self.pot = self.canvas.create_text(400, 320, text="Pot: 0")
-        self.player_frame = Frame(self.root)
-        self.bet = Scale(self.player_frame, from_=0, command=self.scale_bet)
-        self.lbl_bet = Label(self.player_frame, text=0)
-        self.btn_bet = Button(self.player_frame, text='Bet', command=self.place_bet, state=DISABLED)
-        self.btn_fold = Button(self.player_frame, text='Fold', state=DISABLED)
-        self.add_widgets()
-        self.cards = self.get_cards()
-        self.player = PlayerCanvas(self.canvas, str(uuid.uuid4()))
-        self.players = [self.player,]
-        self.face_down_image = PhotoImage(file="cards/b1fv.gif")
-        self.num_cards = 0
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect()
-        self.new_game()
+        super(PokerPlayer, self).__init__()
+        self.poker = poker
+        self.id = id
+        self.conn = conn
+        self.chips = 50
+        self.last_bet = 0
+        self.has_raised = False
+        self.event = Event()
         self.start()
 
-    def add_widgets(self):
-        self.root.title("Poker")
-        self.root.geometry("800x580")
-        self.root.resizable(0, 0)
-        self.root.protocol("WM_DELETE_WINDOW", self.quit)
-        self.canvas.pack(fill='both', expand='yes')
-        self.player_frame.pack()
-        self.bet.grid(row=0, column=0)
-        self.lbl_bet.grid(row=0, column=1)
-        self.btn_bet.grid(row=1, column=0)
-        self.btn_fold.grid(row=1, column=1)
+    def is_playing(self):
+        return self in self.poker.players
 
-    def connect(self):
-        HOST, PORT = socket.gethostname(), 50007
-        try:
-            self.server.connect((HOST, PORT))
-            self.server.send(bytes(self.player.id, "UTF-8"))
-        except socket.error:
-            sys.exit("Remote host hung up unexpectedly.")
+    def run(self):
+        while True:
+            if self.is_playing():
+                data = self.get_data()
+                if data[0] == "quit":
+                    self.poker.quit(self)
+                elif data[0] == "bet":
+                    bet = int(data[1])
+                    if bet > self.poker.current_bet:
+                        self.poker.raise_bet(bet)
+                        self.has_raised = True
+                    else:
+                        if self.poker.players[self.poker.get_next_turn()].has_raised:
+                            self.poker.next_round()
+                    self.poker.bet(bet)
+                    if self.poker.round < 5:
+                        self.poker.turn()
 
-    def get_data(self, num_bytes):
+    def get_data(self):
         try:
-            data = self.server.recv(num_bytes)
+            data = self.conn.recv(1024)
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
         return self.load_data(data)
 
+    def load_data(self, data):
+        return pickle.loads(data)
+                        
     def send_data(self, data):
+        self.event.wait(1)
         try:
-            self.server.send(pickle.dumps(data))
+            self.conn.send(pickle.dumps(data))
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 
-    def load_data(self, data):
-        try:
-            data = pickle.loads(data)
-        except EOFError:
-            sys.exit("Error loading data from host.")
-        return data
-
-    def get_cards(self):
-        cards = {}
-        deck = Deck()
-        for card in deck:
-            cards[hash(card)] = PhotoImage(file=card.get_image())
-        return cards
+class Poker(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+        self.deck = Deck()
+        self.deck.shuffle()
+        self.players = []
+        self.in_game = False
+        self.player_turn = 0
+        self.current_bet = 2
+        self.pot = 0
+        self.round = 1
+        self.start()
 
     def new_game(self):
-        player_data = self.get_data(8000)
-        my_index = [data[0] for data in player_data].index(self.player.id)
-        position = 0
-        index = my_index
-        while position < 8:
-            id, cards, chips = player_data[index]
-            if id == self.player.id:
-                player = self.player
-                images = [self.cards[hash(card)] for card in cards]
-                self.bet.config(to=int(chips))
-            else:
-                player = PlayerCanvas(self.canvas, id)
-                images = [self.face_down_image,] * 2
-                self.players.append(player)                
-            for i, image in enumerate(images):
-                player.cards.append(player.canvas.create_image(70 * i + 5, 50, image=image, anchor=W))
-            player.chip_total = int(chips)
-            player.chips = player.canvas.create_text(75, 110, text="Chips: {}".format(player.chip_total))
-            player.position = position
-            self.canvas.create_window(player.get_position(), window=player.canvas)
-            index = (index + 1) % 8
-            position += 1
-
-    def place_bet(self):
-        self.btn_bet.config(state=DISABLED)
-        self.btn_fold.config(state=DISABLED)
-        self.send_data(("bet", int(self.bet.get()),))
-
-    def get_player(self, id):
+        for i in range(2):
+            for player in self.players:
+                player.add(self.deck.pop())
+        player_data = [(player.id, player.cards, player.chips,) for player in self.players]
         for player in self.players:
-            if id == player.id:
-                return player
+            player.send_data(player_data)
+        self.bet(1)
+        self.players[self.player_turn].has_raised = True
+        self.bet(2)
+        self.turn()
 
-    def scale_bet(self, bet):
-        self.lbl_bet.config(text=int(float(bet)))
+    def bet(self, bet):
+        self.pot += bet
+        player = self.players[self.player_turn]
+        player.chips -= bet
+        player.last_bet = bet
+        self.player_turn = self.get_next_turn()
+        if bet:
+            for p in self.players:
+                p.send_data(("chips", player.id, player.chips,))
+                p.send_data(("pot", self.pot,))
 
-    def quit(self):
-        self.send_data(("quit",))
-        self.root.destroy()
+    def raise_bet(self, bet):
+        self.current_bet = bet
+        for p in self.players:
+            p.has_raised = False
+
+    def next_round(self):
+        if self.round < 4:
+            if self.round > 1:
+                num_cards = 1
+            else:
+                num_cards = 3
+            data = ("round", [self.deck.pop() for i in range(num_cards)],)
+            for player in self.players:
+                player.last_bet = 0
+                player.send_data(data)
+            self.current_bet = 0
+        self.round += 1
+
+    def turn(self):
+        bet = self.current_bet
+        player = self.players[self.player_turn]
+        if bet > player.last_bet:
+            bet -= player.last_bet
+        player.send_data(("turn", bet,))
+
+    def quit(self, player):
+        self.players.remove(player)
+        if self.in_game:
+            for p in self.players:
+                p.send_data(("quit", player.id,))
+        player.conn.close()
+
+    def get_next_turn(self):
+        return (self.player_turn + 1) % len(self.players)
 
     def run(self):
-        while True:
-            data = self.get_data(1024)
+        HOST, PORT = socket.gethostname(), 50007
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((HOST, PORT))
+        s.listen(1)
+        while len(self.players) < 8:
+            conn, address = s.accept()
+            print('Connected by', address)
+            data = conn.recv(1024).decode("UTF-8")
             if not data: break
-            if data[0] == "quit":
-                player = self.get_player(data[1])
-                player.canvas.delete(ALL)
-                self.players.remove(player)
-            elif data[0] == "chips":
-                player = self.get_player(data[1])
-                player.chip_total = int(data[2])
-                player.canvas.itemconfig(player.chips, text="Chips: {}".format(player.chip_total))
-                if player == self.player:
-                    self.bet.config(to=int(player.chip_total))
-            elif data[0] == "pot":
-                self.canvas.itemconfig(self.pot, text="Pot: {}".format(data[1]))
-            elif data[0] == "turn":
-                min_bet = int(data[1])
-                self.btn_bet.config(state=ACTIVE)
-                self.btn_fold.config(state=ACTIVE)
-                self.bet.config(from_=min_bet)
-                self.bet.set(min_bet)
-                self.lbl_bet.config(text=data[1])
-            elif data[0] == "round":
-                for card in data[1]:
-                    self.canvas.create_image(70 * self.num_cards + 255, 240, image=self.cards[hash(card)])
-                    self.num_cards += 1
-            print(data)
+            self.players.append(PokerPlayer(self, data, conn))
+        self.in_game = True
+        self.new_game()
+
+    def __str__(self):
+        s = ""
+        for i, player in enumerate(self.players):
+            s += "Player {}: {}\n".format(i + 1, str(player))
+        return s
 
 if __name__ == "__main__":
-    root = Tk()
-    gui = PlayerGUI(root)
-    root.mainloop()
+    poker = Poker()

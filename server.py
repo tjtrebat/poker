@@ -15,29 +15,12 @@ class PokerPlayer(Hand, Thread):
         self.conn = conn
         self.chips = 50
         self.last_bet = 0
+        self.has_raised = False
         self.event = Event()
         self.start()
 
     def is_playing(self):
         return self in self.poker.players
-
-    def bet(self, amount):
-        self.poker.pot += amount
-        self.chips -= amount
-        self.last_bet = amount
-        for player in self.poker.players:
-            player.send_data(("chips", self.id, self.chips,))
-            player.send_data(("pot", self.poker.pot,))
-
-    def turn(self):
-        self.send_data(("turn", self.poker.current_bet - self.last_bet,))
-
-    def quit(self):
-        self.poker.players.remove(self)
-        if self.poker.in_game:
-            for player in self.poker.players:
-                player.send_data(("quit", self.id,))
-        self.conn.close()
 
     def run(self):
         while True:
@@ -46,20 +29,23 @@ class PokerPlayer(Hand, Thread):
                 if not data: break
                 data = pickle.loads(data)
                 if data[0] == "quit":
-                    self.quit()
+                    self.poker.quit(self)
                 elif data[0] == "bet":
                     bet = int(data[1])
                     if bet > self.poker.current_bet:
-                        self.poker.current_bet = bet
-                    self.bet(bet)
-                    self.poker.player_turn = self.poker.get_next_player()
-                    self.poker.players[self.poker.get_next_player()].turn()
+                        self.poker.raise_bet(bet)
+                        self.has_raised = True
+                    else:
+                        if self.poker.players[self.poker.get_next_turn()].has_raised:
+                            self.poker.next_round()
+                    self.poker.bet(bet)
+                    self.poker.turn()
 
     def send_data(self, data):
         self.event.wait(1)
         try:
             self.conn.send(pickle.dumps(data))
-        except:
+        except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 
 class Poker(Thread):
@@ -72,17 +58,60 @@ class Poker(Thread):
         self.player_turn = 0
         self.current_bet = 2
         self.pot = 0
+        self.round = 1
         self.start()
 
     def new_game(self):
         for i in range(2):
             for player in self.players:
-                player.add(self.deck.cards.pop())
+                player.add(self.deck.pop())
         player_data = [(player.id, player.cards, player.chips,) for player in self.players]
         for player in self.players:
             player.send_data(player_data)
+        self.bet(1)
+        self.players[self.player_turn].has_raised = True
+        self.bet(2)
+        self.turn()
 
-    def get_next_player(self):
+    def bet(self, bet):
+        self.pot += bet
+        player = self.players[self.player_turn]
+        player.chips -= bet
+        player.last_bet = bet
+        for p in self.players:
+            p.send_data(("chips", player.id, player.chips,))
+            p.send_data(("pot", self.pot,))
+        self.player_turn = self.get_next_turn()
+
+    def raise_bet(self, bet):
+        self.current_bet = bet
+        for p in self.players:
+            p.has_raised = False
+
+    def next_round(self):
+        if self.round > 1:
+            num_cards = 1
+        else:
+            num_cards = 3
+        self.round += 1
+        data = ("round", [self.deck.pop() for i in range(num_cards)],)
+        for player in self.players:
+            player.last_bet = 0
+            player.send_data(data)
+        self.current_bet = 0
+
+    def turn(self):
+        player = self.players[self.player_turn]
+        player.send_data(("turn", self.current_bet - player.last_bet,))
+
+    def quit(self, player):
+        self.players.remove(player)
+        if self.in_game:
+            for p in self.players:
+                p.send_data(("quit", player.id,))
+        player.conn.close()
+
+    def get_next_turn(self):
         return (self.player_turn + 1) % len(self.players)
 
     def run(self):
@@ -96,13 +125,9 @@ class Poker(Thread):
             data = conn.recv(1024).decode("UTF-8")
             if not data: break
             self.players.append(PokerPlayer(self, data, conn))
-        self.new_game()
         self.in_game = True
         while True:
-            self.players[self.player_turn].bet(1)
-            self.player_turn = self.get_next_player()
-            self.players[self.player_turn].bet(2)
-            self.players[self.get_next_player()].turn()
+            self.new_game()
             break
 
     def __str__(self):

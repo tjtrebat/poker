@@ -16,11 +16,13 @@ class PlayerCanvas:
         self.cards = []
         self.chips = None
         self.chip_total = 0
+        self.position = 0
 
-    def __str__(self):
-        return self.id
+    def get_position(self):
+        positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
+        return positions[self.position]
 
-class PokerGUI(Thread):
+class PlayerGUI(Thread):
     def __init__(self, root):
         Thread.__init__(self)
         self.root = root
@@ -36,6 +38,7 @@ class PokerGUI(Thread):
         self.player = PlayerCanvas(self.canvas, str(uuid.uuid4()))
         self.players = [self.player,]
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
+        self.num_cards = 0
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect()
         self.new_game()
@@ -53,6 +56,34 @@ class PokerGUI(Thread):
         self.btn_bet.grid(row=1, column=0)
         self.btn_fold.grid(row=1, column=1)
 
+    def connect(self):
+        HOST, PORT = socket.gethostname(), 50007
+        try:
+            self.server.connect((HOST, PORT))
+            self.server.send(bytes(self.player.id, "UTF-8"))
+        except socket.error:
+            sys.exit("Remote host hung up unexpectedly.")
+
+    def get_data(self, num_bytes):
+        try:
+            data = self.server.recv(num_bytes)
+        except socket.error:
+            sys.exit("Remote host hung up unexpectedly.")
+        return self.load_data(data)
+
+    def send_data(self, data):
+        try:
+            self.server.send(pickle.dumps(data))
+        except socket.error:
+            sys.exit("Remote host hung up unexpectedly.")
+
+    def load_data(self, data):
+        try:
+            data = pickle.loads(data)
+        except EOFError:
+            sys.exit("Error loading data from host.")
+        return data
+
     def get_cards(self):
         cards = {}
         deck = Deck()
@@ -61,8 +92,7 @@ class PokerGUI(Thread):
         return cards
 
     def new_game(self):
-        data = self.get_data(8000)
-        player_data = pickle.loads(data)
+        player_data = self.get_data(8000)
         my_index = [data[0] for data in player_data].index(self.player.id)
         position = 0
         index = my_index
@@ -77,10 +107,11 @@ class PokerGUI(Thread):
                 images = [self.face_down_image,] * 2
                 self.players.append(player)                
             for i, image in enumerate(images):
-                player.cards.append(player.canvas.create_image(5 + 70 * i, 50, image=image, anchor=W))
+                player.cards.append(player.canvas.create_image(70 * i + 5, 50, image=image, anchor=W))
             player.chip_total = int(chips)
             player.chips = player.canvas.create_text(75, 110, text="Chips: {}".format(player.chip_total))
-            self.canvas.create_window(self.get_position(position), window=player.canvas)
+            player.position = position
+            self.canvas.create_window(player.get_position(), window=player.canvas)
             index = (index + 1) % 8
             position += 1
 
@@ -88,10 +119,6 @@ class PokerGUI(Thread):
         self.btn_bet.config(state=DISABLED)
         self.btn_fold.config(state=DISABLED)
         self.send_data(("bet", int(self.bet.get()),))
-
-    def get_position(self, position):
-        positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
-        return positions[position]
 
     def get_player(self, id):
         for player in self.players:
@@ -109,7 +136,6 @@ class PokerGUI(Thread):
         while True:
             data = self.get_data(1024)
             if not data: break
-            data = pickle.loads(data)
             if data[0] == "quit":
                 player = self.get_player(data[1])
                 player.canvas.delete(ALL)
@@ -129,30 +155,13 @@ class PokerGUI(Thread):
                 self.bet.config(from_=min_bet)
                 self.bet.set(min_bet)
                 self.lbl_bet.config(text=data[1])
+            elif data[0] == "round":
+                for card in data[1]:
+                    self.canvas.create_image(70 * self.num_cards + 255, 240, image=self.cards[hash(card)])
+                    self.num_cards += 1
             print(data)
-
-    def connect(self):
-        HOST, PORT = socket.gethostname(), 50007
-        try:
-            self.server.connect((HOST, PORT))
-            self.server.send(bytes(self.player.id, "UTF-8"))
-        except:
-            sys.exit("Remote host hung up unexpectedly.")
-
-    def get_data(self, num_bytes):
-        try:
-            data = self.server.recv(num_bytes)
-        except:
-            sys.exit("Remote host hung up unexpectedly.")
-        return data
-
-    def send_data(self, data):
-        try:
-            self.server.send(pickle.dumps(data))
-        except:
-            sys.exit("Remote host hung up unexpectedly.")
 
 if __name__ == "__main__":
     root = Tk()
-    gui = PokerGUI(root)
+    gui = PlayerGUI(root)
     root.mainloop()

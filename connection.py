@@ -7,7 +7,6 @@ import pickle
 class Connection:
     def __init__(self, conn=None):
         self.conn = conn or socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.data = None
 
     def connect(self):
         HOST, PORT = "localhost", 50007
@@ -29,9 +28,13 @@ class Connection:
             sys.exit("Remote host hung up unexpectedly.")
         return self.load_data(data)
 
-    def send_data(self):
+    def send_data(self, data):
+        if isinstance(data, str):
+            data = self.get_bytes(data)
+        else:
+            data = self.get_pickle(data)
         try:
-            self.conn.send(self.data)
+            self.conn.sendall(data)
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 

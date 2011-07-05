@@ -13,10 +13,10 @@ class PokerPlayer(Hand):
         self.has_raised = False
         self.conn = Connection(conn)
 
+    """
     def is_playing(self):
         return self in self.poker.players
 
-    """
     def run(self):
         while True:
             if self.is_playing():
@@ -59,8 +59,7 @@ class Poker:
                 player.add(self.deck.pop())
         player_data = [(player.id, player.cards, player.chips,) for player in self.players]
         for player in self.players:
-            player.conn.data = player.conn.get_pickle(player_data)
-            player.conn.send_data()
+            player.conn.send_data(player_data)
         self.bet(1)
         self.players[self.player_turn].has_raised = True
         self.bet(2)
@@ -74,10 +73,7 @@ class Poker:
         self.player_turn = self.get_next_turn()
         if bet:
             for p in self.players:
-                p.conn.data = p.conn.get_pickle(("chips", player.id, player.chips,))
-                p.conn.send_data()
-                p.conn.data = p.conn.get_pickle(("pot", self.pot,))
-                p.conn.send_data()
+                p.conn.send_data({"player_id": player.id, "chips": player.chips, "pot": self.pot})
 
     def raise_bet(self, bet):
         self.current_bet = bet
@@ -90,11 +86,10 @@ class Poker:
                 num_cards = 1
             else:
                 num_cards = 3
-            data = ("round", [self.deck.pop() for i in range(num_cards)],)
+            data = {"cards": [self.deck.pop() for i in range(num_cards)]}
             for player in self.players:
                 player.last_bet = 0
-                player.conn.data = player.conn.get_pickle(data)
-                player.conn.send_data()
+                player.conn.send_data(data)
             self.current_bet = 0
         self.round += 1
 
@@ -103,15 +98,13 @@ class Poker:
         player = self.players[self.player_turn]
         if bet > player.last_bet:
             bet -= player.last_bet
-        player.conn.data = player.conn.get_pickle(("turn", bet,))
-        player.conn.send_data()
+        player.conn.send_data({"bet": bet})
 
     def quit(self, player):
         self.players.remove(player)
         player.conn.close()
         for p in self.players:
-            p.conn.data = p.conn.get_pickle(("quit", player.id,))
-            p.conn.send_data()
+            p.conn.send_data({"exit": player.id})
 
     def get_next_turn(self):
         return (self.player_turn + 1) % len(self.players)

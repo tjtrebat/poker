@@ -39,8 +39,7 @@ class PlayerGUI(Thread):
         self.num_cards = 0
         self.conn = Connection()
         self.conn.connect()
-        self.conn.data = self.conn.get_bytes(self.player.id)
-        self.conn.send_data()
+        self.conn.send_data(self.player.id)
         self.new_game()
         self.start()
 
@@ -90,8 +89,7 @@ class PlayerGUI(Thread):
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)
         self.btn_fold.config(state=DISABLED)
-        self.conn.data = self.conn.get_pickle(("bet", int(self.bet.get()),))
-        self.conn.send_data()
+        self.conn.send_data({"player_id": self.player.id, "bet": int(self.bet.get())})
 
     def get_player(self, id):
         for player in self.players:
@@ -102,10 +100,10 @@ class PlayerGUI(Thread):
         self.lbl_bet.config(text=int(float(bet)))
 
     def quit(self):
-        self.conn.data = self.conn.get_pickle(("quit",))
-        self.conn.send_data()
+        self.conn.send_data({"exit": self.player.id})
         self.root.destroy()
 
+    """
     def run(self):
         while True:
             data = self.conn.get_data(1024)
@@ -134,6 +132,7 @@ class PlayerGUI(Thread):
                     self.canvas.create_image(70 * self.num_cards + 255, 240, image=self.cards[hash(card)])
                     self.num_cards += 1
             print(data)
+    """
 
 if __name__ == "__main__":
     root = Tk()

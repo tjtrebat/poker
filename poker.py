@@ -5,9 +5,8 @@ from connection import *
 from cards import *
 
 class PokerPlayer(Hand):
-    def __init__(self, id, conn):
+    def __init__(self, conn):
         super(PokerPlayer, self).__init__()
-        self.id = id
         self.chips = 50
         self.last_bet = 0
         self.has_raised = False

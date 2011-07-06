@@ -1,14 +1,15 @@
 __author__ = 'Tom'
 
-import uuid
+import random
+import threading
+import socketserver
 from tkinter import *
 from tkinter.ttk import *
 from connection import *
 from cards import *
 
 class PlayerCanvas:
-    def __init__(self, root, id):
-        self.id = id
+    def __init__(self, root):
         self.canvas = Canvas(root, width=145, height=115)
         self.cards = []
         self.chips = None
@@ -19,7 +20,16 @@ class PlayerCanvas:
         positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[self.position]
 
+class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 
+    def handle(self):
+        data = self.request.recv(1024)
+        cur_thread = threading.currentThread()
+        response = "%s: %s" % (cur_thread.getName(), data)
+        self.request.send(response)
+
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
 
 class PlayerGUI:
     def __init__(self, root):
@@ -33,15 +43,16 @@ class PlayerGUI:
         self.btn_fold = Button(self.player_frame, text='Fold', state=DISABLED)
         self.add_widgets()
         self.cards = self.get_cards()
-        self.player = PlayerCanvas(self.canvas, str(uuid.uuid4()))
-        self.players = [self.player,]
+        self.players = []
         self.face_down_image = PhotoImage(file="cards/b1fv.gif")
         self.num_cards = 0
+        HOST, PORT = "localhost", random.randint(10000,60000)
+        self.start_server(HOST, PORT)
+        self.update_widgets()
         self.conn = Connection()
-        self.conn.connect()
-        self.conn.send_data(self.player.id)
-        self.new_game()
-        self.start()
+        self.conn.connect(HOST, 50007)
+        self.conn.send_data("{} {}".format(HOST, PORT))
+        #self.new_game()
 
     def add_widgets(self):
         self.root.title("Poker")
@@ -55,6 +66,20 @@ class PlayerGUI:
         self.btn_bet.grid(row=1, column=0)
         self.btn_fold.grid(row=1, column=1)
 
+    def update_widgets(self):
+        print("Updating Widgets...")
+        self.root.after(1000, self.update_widgets)
+
+    def start_server(self, host, port):
+        server = ThreadedTCPServer((host, port), ThreadedTCPRequestHandler)
+        # Start a thread with the server -- that thread will then start one
+        # more thread for each request
+        server_thread = threading.Thread(target=server.serve_forever)
+        # Exit the server thread when the main thread terminates
+        server_thread.setDaemon(True)
+        server_thread.start()
+        print("Server loop running in thread:", server_thread.getName())
+
     def get_cards(self):
         cards = {}
         deck = Deck()
@@ -63,6 +88,8 @@ class PlayerGUI:
         return cards
 
     def new_game(self):
+        pass
+        """
         player_data = self.conn.get_data(4096)
         my_index = [data[0] for data in player_data].index(self.player.id)
         position = 0
@@ -85,6 +112,7 @@ class PlayerGUI:
             self.canvas.create_window(player.get_position(), window=player.canvas)
             index = (index + 1) % 8
             position += 1
+        """
 
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)

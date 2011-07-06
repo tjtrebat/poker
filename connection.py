@@ -8,10 +8,9 @@ class Connection:
     def __init__(self, conn=None):
         self.conn = conn or socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def connect(self):
-        HOST, PORT = "localhost", 50007
+    def connect(self, host, port):
         try:
-            self.conn.connect((HOST, PORT))
+            self.conn.connect((host, port))
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 

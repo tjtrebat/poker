@@ -1,7 +1,6 @@
 __author__ = 'Tom'
 
 import uuid
-from threading import Thread
 from tkinter import *
 from tkinter.ttk import *
 from connection import *
@@ -20,9 +19,10 @@ class PlayerCanvas:
         positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[self.position]
 
-class PlayerGUI(Thread):
+
+
+class PlayerGUI:
     def __init__(self, root):
-        Thread.__init__(self)
         self.root = root
         self.canvas = Canvas(self.root, width=800, height=520)
         self.pot = self.canvas.create_text(400, 320, text="Pot: 0")

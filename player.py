@@ -11,12 +11,12 @@ from connection import *
 from cards import *
 
 class PlayerCanvas:
-    def __init__(self, root):
+    def __init__(self, root, position):
         self.canvas = Canvas(root, width=145, height=115)
         self.cards = []
         self.chips = None
         self.chip_total = 0
-        self.position = 0
+        self.position = position
 
     def get_position(self):
         positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
@@ -54,7 +54,6 @@ class PlayerGUI:
         self.update_widgets()
         self.conn = Connection(HOST, 50007)
         self.conn.send_data((HOST, PORT,))
-        #self.new_game()
 
     def add_widgets(self):
         self.root.title("Poker")
@@ -74,13 +73,11 @@ class PlayerGUI:
         except (IOError, EOFError):
             pass
         else:
-            print(data)
             if self.last_updated is None:
-                print("Ohhh we updating these widgets...")
-                #for i, player in enumerate(data):
-                #    pass
+                self.new_game(data.data)
+                self.last_updated = data.timestamp
                 
-        self.root.after(1000, self.update_widgets)
+        self.root.after(5000, self.update_widgets)
 
     def start_server(self, host, port):
         server = ThreadedTCPServer((host, port), ThreadedTCPRequestHandler)
@@ -89,32 +86,19 @@ class PlayerGUI:
         server_thread.start()
         print("Server loop running in thread:", server_thread.getName())
 
-    def new_game(self):
-        pass
-        """
-        player_data = self.conn.get_data(4096)
-        my_index = [data[0] for data in player_data].index(self.player.id)
-        position = 0
-        index = my_index
-        while position < 8:
-            id, cards, chips = player_data[index]
-            if id == self.player.id:
-                player = self.player
-                images = [self.cards[hash(card)] for card in cards]
-                self.bet.config(to=int(chips))
-            else:
-                player = PlayerCanvas(self.canvas, id)
-                images = [self.face_down_image,] * 2
-                self.players.append(player)                
-            for i, image in enumerate(images):
-                player.cards.append(player.canvas.create_image(70 * i + 5, 50, image=image, anchor=W))
-            player.chip_total = int(chips)
-            player.chips = player.canvas.create_text(75, 110, text="Chips: {}".format(player.chip_total))
-            player.position = position
-            self.canvas.create_window(player.get_position(), window=player.canvas)
-            index = (index + 1) % 8
-            position += 1
-        """
+    def new_game(self, player_data):
+        for i, player in enumerate(player_data):
+            images = [self.face_down_image,] * 2
+            player_canvas = PlayerCanvas(self.canvas, i)
+            if not i:
+                images = [self.cards[hash(card)] for card in player["cards"]]
+                self.bet.config(to=int(player["chips"]))
+            for j, image in enumerate(images):
+                player_canvas.cards.append(player_canvas.canvas.create_image(70 * j + 5, 50, image=image, anchor=W))
+            player_canvas.chip_total = int(player["chips"])
+            player_canvas.chips = player_canvas.canvas.create_text(75, 110, text="Chips: {}".format(player_canvas.chip_total))
+            self.canvas.create_window(player_canvas.get_position(), window=player_canvas.canvas)
+            self.players.append(player_canvas)
 
     def place_bet(self):
         self.btn_bet.config(state=DISABLED)

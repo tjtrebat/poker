@@ -1,8 +1,9 @@
 __author__ = 'Tom'
 
 import pickle
-import socketserver
-from connection import *
+import datetime
+from client import *
+from server import *
 from cards import *
 
 class PokerPlayer(Hand):
@@ -11,7 +12,7 @@ class PokerPlayer(Hand):
         self.chips = 50
         self.last_bet = 0
         self.has_raised = False
-        self.conn = Connection(host, port)
+        self.conn = Client(host, port)
 
     """
     def is_playing(self):
@@ -36,9 +37,6 @@ class PokerPlayer(Hand):
                         self.poker.turn()
     """
 
-class PokerHandler(socketserver.BaseRequestHandler):
-    pass
-
 class Poker:
     def __init__(self):
         self.deck = Deck()
@@ -50,32 +48,29 @@ class Poker:
         self.current_bet = 2
         self.pot = 0
         self.round = 1
-        self.server = None
-        self.start_lobby()
+        self.server = Server("localhost", 50007)
+        self.run_lobby()
         self.new_game()
 
-    def start_lobby(self):
-        HOST, PORT = "localhost", 50007
-        self.server = socketserver.TCPServer((HOST, PORT), PokerHandler)
+    def run_lobby(self):
         while len(self.players) < self.max_players:
             conn, address = self.server.get_request()
             print('Connected by', address)
             data = pickle.loads(conn.recv(1024))
-            self.players.append(PokerPlayer(data.data[0], int(data.data[1])))
+            self.players.append(PokerPlayer(data[0], int(data[1])))
 
     def new_game(self):
         for i in range(2):
             for player in self.players:
                 player.add(self.deck.pop())
-        for i in range(len(self.players)):
-            players = self.players[i:len(self.players)] + self.players[0:i]
-            players = [{"cards": player.cards, "chips": player.chips} for player in players]
-            self.players[i].conn.send_data(players)
+        for player in self.players:
+            player.conn.send({"players": [0,], "cards": [player.cards,], "timestamp": datetime.datetime.now()})
         #self.bet(1)
         #self.players[self.player_turn].has_raised = True
         #self.bet(2)
         #self.turn()
 
+    """
     def bet(self, bet):
         self.pot += bet
         player = self.players[self.player_turn]
@@ -119,6 +114,7 @@ class Poker:
 
     def get_next_turn(self):
         return (self.player_turn + 1) % len(self.players)
+    """
 
 if __name__ == "__main__":
     poker = Poker()

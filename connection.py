@@ -3,46 +3,30 @@ __author__ = 'Tom'
 import sys
 import socket
 import pickle
+import datetime
+
+class Data:
+    def __init__(self, data):
+        self.data = data
+        self.timestamp = datetime.datetime.now()
 
 class Connection:
-    def __init__(self, conn=None):
-        self.conn = conn or socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def __init__(self, host, port):
+        self.host, self.port = host, port
+        self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect()
 
-    def connect(self, host, port):
+    def connect(self):
         try:
-            self.conn.connect((host, port))
+            self.conn.connect((self.host, self.port))
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
-
-    def get_bytes(self, data):
-        return bytes(data, "UTF-8")
-
-    def get_pickle(self, data):
-        return pickle.dumps(data)
-
-    def get_data(self, num_bytes):
-        try:
-            data = self.conn.recv(num_bytes)
-        except socket.error:
-            sys.exit("Remote host hung up unexpectedly.")
-        return self.load_data(data)
 
     def send_data(self, data):
-        if isinstance(data, str):
-            data = self.get_bytes(data)
-        else:
-            data = self.get_pickle(data)
         try:
-            self.conn.sendall(data)
+            self.conn.sendall(pickle.dumps(Data(data)))
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
-
-    def load_data(self, data):
-        try:
-            data = pickle.loads(data)
-        except EOFError:
-            sys.exit("Remote host hung up unexpectedly.")
-        return data
 
     def close(self):
         self.conn.close()

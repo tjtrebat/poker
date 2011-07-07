@@ -1,6 +1,8 @@
 __author__ = 'Tom'
 
+import pickle
 import random
+import datetime
 import threading
 import socketserver
 from tkinter import *
@@ -24,9 +26,9 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         data = self.request.recv(1024)
-        cur_thread = threading.currentThread()
-        response = "%s: %s" % (cur_thread.getName(), data)
-        self.request.send(response)
+        data = pickle.loads(data)
+        pickle.dump(data, open("data.p", "wb"))
+        #print(data.data)
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
@@ -48,10 +50,10 @@ class PlayerGUI:
         self.num_cards = 0
         HOST, PORT = "localhost", random.randint(10000,60000)
         self.start_server(HOST, PORT)
+        self.last_updated = None
         self.update_widgets()
-        self.conn = Connection()
-        self.conn.connect(HOST, 50007)
-        self.conn.send_data("{} {}".format(HOST, PORT))
+        self.conn = Connection(HOST, 50007)
+        self.conn.send_data((HOST, PORT,))
         #self.new_game()
 
     def add_widgets(self):
@@ -67,25 +69,25 @@ class PlayerGUI:
         self.btn_fold.grid(row=1, column=1)
 
     def update_widgets(self):
-        print("Updating Widgets...")
+        try:
+            data = pickle.load(open("data.p", "rb"))
+        except (IOError, EOFError):
+            pass
+        else:
+            print(data)
+            if self.last_updated is None:
+                print("Ohhh we updating these widgets...")
+                #for i, player in enumerate(data):
+                #    pass
+                
         self.root.after(1000, self.update_widgets)
 
     def start_server(self, host, port):
         server = ThreadedTCPServer((host, port), ThreadedTCPRequestHandler)
-        # Start a thread with the server -- that thread will then start one
-        # more thread for each request
         server_thread = threading.Thread(target=server.serve_forever)
-        # Exit the server thread when the main thread terminates
         server_thread.setDaemon(True)
         server_thread.start()
         print("Server loop running in thread:", server_thread.getName())
-
-    def get_cards(self):
-        cards = {}
-        deck = Deck()
-        for card in deck:
-            cards[hash(card)] = PhotoImage(file=card.get_image())
-        return cards
 
     def new_game(self):
         pass
@@ -118,11 +120,6 @@ class PlayerGUI:
         self.btn_bet.config(state=DISABLED)
         self.btn_fold.config(state=DISABLED)
         self.conn.send_data({"player_id": self.player.id, "bet": int(self.bet.get())})
-
-    def get_player(self, id):
-        for player in self.players:
-            if id == player.id:
-                return player
 
     def scale_bet(self, bet):
         self.lbl_bet.config(text=int(float(bet)))
@@ -161,6 +158,13 @@ class PlayerGUI:
                     self.num_cards += 1
             print(data)
     """
+
+    def get_cards(self):
+        cards = {}
+        deck = Deck()
+        for card in deck:
+            cards[hash(card)] = PhotoImage(file=card.get_image())
+        return cards
 
 if __name__ == "__main__":
     root = Tk()

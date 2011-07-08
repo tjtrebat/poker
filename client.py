@@ -9,6 +9,7 @@ class Client:
         self.host, self.port = host, port
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect()
+        self.conn.setblocking(0)
 
     def connect(self):
         try:

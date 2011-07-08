@@ -1,31 +1,30 @@
 __author__ = 'Tom'
 
-import pickle
-import threading
-import socketserver
+import socket
+import asyncore
 
-class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
+class PokerHandler(asyncore.dispatcher_with_send):
 
-    def handle(self):
-        data = self.request.recv(1024)
-        data = pickle.loads(data)
-        pickle.dump(data, open("data.p", "wb"))
+    def handle_read(self):
+        data = self.recv(8192)
+        print(data)
+        #if data:
+        #    self.send(data)
 
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    pass
+class PokerServer(asyncore.dispatcher):
+    def __init__(self, host, port):
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.set_reuse_addr()
+        self.bind((host, port))
+        self.listen(5)
+        asyncore.loop()
 
-class Server:
-    def __init__(self, HOST, PORT):
-        self.server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
-        self.run()
-
-    def run(self):
-        server_thread = threading.Thread(target=self.server.serve_forever)
-        server_thread.setDaemon(True)
-        server_thread.start()
-        print("Server loop running in thread:", server_thread.getName())
-
-    def get_request(self):
-        return self.server.get_request()
-
-  
+    def handle_accept(self):
+        pair = self.accept()
+        if pair is None:
+            pass
+        else:
+            sock, addr = pair
+            print('Incoming connection from %s' % repr(addr))
+            handler = PokerHandler(sock)

@@ -4,6 +4,8 @@ import uuid
 import random
 import datetime
 import pickle
+import threading
+import multiprocessing
 from tkinter import *
 from tkinter.ttk import *
 from client import *
@@ -23,8 +25,9 @@ class PlayerCanvas:
         positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[self.position]
 
-class PlayerGUI:
+class PlayerGUI(threading.Thread):
     def __init__(self, root):
+        threading.Thread.__init__(self)
         self.root = root
         self.canvas = Canvas(self.root, width=800, height=520)
         self.pot = self.canvas.create_text(400, 320, text="Pot: 0")
@@ -41,11 +44,10 @@ class PlayerGUI:
         self.add_widgets()
         self.add_canvas_widgets()
         self.last_updated = None
-        HOST, PORT = "localhost", random.randint(10000, 60000)
-        #self.server = Server(HOST, PORT)
+        self.HOST, self.PORT = "localhost", random.randint(10000, 60000)
         self.conn = Client("localhost", 50007)
-        self.conn.send({"id": self.id, "host": HOST, "port": PORT})
-        self.conn.send({"quit": self.id, "timestamp": datetime.datetime.now()})
+        self.conn.send("join {} {} {}".format(self.id, self.HOST, self.PORT))
+        self.start()
         #self.update_widgets()
 
     def add_widgets(self):
@@ -70,9 +72,12 @@ class PlayerGUI:
             self.canvas.create_window(player_canvas.get_position(), window=player_canvas.canvas)
             self.players.append(player_canvas)
 
+    def run(self):
+        server = PokerServer(self.HOST, self.PORT, "{}.p".format(self.id))
+
     def update_widgets(self):
         try:
-            data = pickle.load(open("data.p", "rb"))
+            data = pickle.load(open("{}.p".format(self.id), "rb"))
         except (IOError, EOFError):
             pass
         else:

@@ -1,7 +1,6 @@
 __author__ = 'Tom'
 
 import sys
-import pickle
 import socket
 
 class Client:
@@ -9,7 +8,6 @@ class Client:
         self.host, self.port = host, port
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect()
-        self.conn.setblocking(0)
 
     def connect(self):
         try:
@@ -19,7 +17,7 @@ class Client:
 
     def send(self, data):
         try:
-            self.conn.sendall(pickle.dumps(data))
+            self.conn.sendall(bytes(data, "UTF-8"))
         except socket.error:
             sys.exit("Remote host hung up unexpectedly.")
 

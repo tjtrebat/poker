@@ -1,7 +1,9 @@
 __author__ = 'Tom'
 
+import time
 import pickle
 import datetime
+import multiprocessing
 from client import *
 from server import *
 from cards import *
@@ -49,20 +51,25 @@ class Poker:
         self.current_bet = 2
         self.pot = 0
         self.round = 1
-        self.last_updated = None
-        self.server = PokerServer("localhost", 50007)
-        #self.run_lobby()
-        #self.new_game()
-        #self.players[0].conn.send({"timestamp": datetime.datetime.now()})
-        #self.server.server.serve_forever() #self.start()
+        update = multiprocessing.Process(target=self.update_server)
+        update.start()
 
-    def run_lobby(self):
-        while len(self.players) < self.max_players:
-            conn, address = self.server.get_request()
-            print('Connected by', address)
-            data = pickle.loads(conn.recv(1024))
-            self.players.append(PokerPlayer(data["id"], data["host"], data["port"]))
+    def run_server(self):
+        server = PokerServer("localhost", 50007, "poker.p")
 
+    def update_server(self):
+        while True:
+            try:
+                data = open("poker.p", "rb")
+            except (IOError, EOFError):
+                pass
+            else:
+                if not self.in_game:
+                    for line in data.readlines():
+                        print(line)
+            time.sleep(5)
+
+    """
     def new_game(self):
         for i in range(2):
             for player in self.players:
@@ -77,23 +84,13 @@ class Poker:
         #self.bet(2)
         #self.turn()
 
-    def run(self):
-        pass
-        """
-        while True:
-            try:
-                data = pickle.load(open("data.p", "rb"))
-            except (IOError, EOFError):
-                pass
-            else:
-                if self.last_updated is None or self.last_updated < data["timestamp"]:
-                    print(data)
-                    self.last_updated = data["timestamp"]
-            self.event.wait(1)
-        """
+    def run_lobby(self):
+        while len(self.players) < self.max_players:
+            conn, address = self.server.get_request()
+            print('Connected by', address)
+            data = pickle.loads(conn.recv(1024))
+            self.players.append(PokerPlayer(data["id"], data["host"], data["port"]))
 
-
-    """
     def bet(self, bet):
         self.pot += bet
         player = self.players[self.player_turn]
@@ -141,3 +138,5 @@ class Poker:
 
 if __name__ == "__main__":
     poker = Poker()
+    server = multiprocessing.Process(target=poker.run_server)
+    server.start()

@@ -9,13 +9,19 @@ from server import *
 from cards import *
 
 class PokerPlayer(Hand):
-    def __init__(self, id, host, port):
+    def __init__(self, id, conn=None):
         super(PokerPlayer, self).__init__()
         self.id = id
         self.chips = 50
         self.last_bet = 0
         self.has_raised = False
-        self.conn = Client(host, port)
+        self.conn = conn
+
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __str__(self):
+        return self.id
 
     """
     def is_playing(self):
@@ -51,6 +57,7 @@ class Poker:
         self.current_bet = 2
         self.pot = 0
         self.round = 1
+        self.line_num = 0
         update = multiprocessing.Process(target=self.update_server)
         update.start()
 
@@ -64,9 +71,22 @@ class Poker:
             except (IOError, EOFError):
                 pass
             else:
-                if not self.in_game:
-                    for line in data.readlines():
-                        print(line)
+                for line in data.readlines()[self.line_num:]:
+                    line = line.strip().split()
+                    if not self.in_game:
+                        player = PokerPlayer(line[1])
+                        if line[0] == "join":
+                            if player not in self.players:
+                                print("Adding {}".format(str(player)))
+                                player.conn = Client(line[2], int(line[3]))
+                                self.players.append(player)
+                                if len(self.players) >= self.max_players:
+                                    self.in_game = True
+                        elif line[0] == "quit":
+                            print("Removing {}".format(str(player)))
+                            if player in self.players:
+                                self.players.remove(player)
+                    self.line_num += 1
             time.sleep(5)
 
     """

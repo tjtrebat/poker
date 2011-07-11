@@ -117,7 +117,7 @@ class PlayerGUI(threading.Thread):
         self.lbl_bet.config(text=int(float(bet)))
 
     def quit(self):
-        self.conn.send({"quit": self.id, "timestamp": datetime.datetime.now()})
+        self.conn.send("quit {}".format(self.id))
         self.root.destroy()
 
     """

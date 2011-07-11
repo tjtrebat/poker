@@ -2,8 +2,6 @@ __author__ = 'Tom'
 
 import uuid
 import random
-import datetime
-import pickle
 import threading
 import multiprocessing
 from tkinter import *
@@ -43,12 +41,12 @@ class PlayerGUI(threading.Thread):
         self.id = str(uuid.uuid4())
         self.add_widgets()
         self.add_canvas_widgets()
-        self.last_updated = None
         self.HOST, self.PORT = "localhost", random.randint(10000, 60000)
         self.conn = Client("localhost", 50007)
         self.conn.send("join {} {} {}".format(self.id, self.HOST, self.PORT))
         self.start()
-        #self.update_widgets()
+        self.line_num = 0
+        self.update_widgets()
 
     def add_widgets(self):
         self.root.title("Poker")
@@ -77,21 +75,19 @@ class PlayerGUI(threading.Thread):
 
     def update_widgets(self):
         try:
-            data = pickle.load(open("{}.p".format(self.id), "rb"))
+            data = open("{}.p".format(self.id), "rb")
         except (IOError, EOFError):
             pass
         else:
-            if self.last_updated is None or self.last_updated < data["timestamp"]:
-                print("Updating widgets...")
-                for key, value in data.items():
-                    if key == "players":
-                        for i, player in enumerate(value):
-                            player_canvas = self.players[i]
-                            player_canvas.id = player["id"]
-                            if not i:
-                                for j, card in enumerate(player["cards"]):
-                                    player_canvas.canvas.itemconfig(player_canvas.cards[j], image=self.cards[hash(card)])
-                self.last_updated = data["timestamp"]
+            for line in data.readlines()[self.line_num:]:
+                if key == "players":
+                    for i, player in enumerate(value):
+                        player_canvas = self.players[i]
+                        player_canvas.id = player["id"]
+                        if not i:
+                            for j, card in enumerate(player["cards"]):
+                                player_canvas.canvas.itemconfig(player_canvas.cards[j], image=self.cards[hash(card)])
+                self.line_num += 1
         self.root.after(5000, self.update_widgets)
 
     def get_cards(self):

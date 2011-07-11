@@ -18,6 +18,12 @@ class PokerHandler(asyncore.dispatcher_with_send):
         print(data)
         handle.write(data + "\n")
 
+    @classmethod
+    def load_data(cls, line):
+        line = line.strip().split()
+        line = [w.decode("UTF-8") for w in line]
+        return line
+
 class PokerServer(asyncore.dispatcher):
     def __init__(self, host, port, file_name):
         asyncore.dispatcher.__init__(self)

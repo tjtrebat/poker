@@ -1,8 +1,6 @@
 __author__ = 'Tom'
 
 import time
-import pickle
-import datetime
 import multiprocessing
 from client import *
 from server import *
@@ -62,9 +60,13 @@ class Poker:
         update.start()
 
     def run_server(self):
-        server = PokerServer("localhost", 50007, "poker.p")
+        self.server = PokerServer("localhost", 50007, "poker.p")
 
     def update_server(self):
+        while True:
+            
+
+    """
         while True:
             try:
                 data = open("poker.p", "rb")
@@ -72,7 +74,7 @@ class Poker:
                 pass
             else:
                 for line in data.readlines()[self.line_num:]:
-                    line = line.strip().split()
+                    line = PokerHandler.load_data(line)
                     if not self.in_game:
                         player = PokerPlayer(line[1])
                         if line[0] == "join":
@@ -89,7 +91,7 @@ class Poker:
                     self.line_num += 1
             time.sleep(5)
 
-    """
+
     def new_game(self):
         for i in range(2):
             for player in self.players:

@@ -60,13 +60,9 @@ class Poker:
         update.start()
 
     def run_server(self):
-        self.server = PokerServer("localhost", 50007, "poker.p")
+        server = PokerServer("localhost", 50007, "poker.p")
 
     def update_server(self):
-        while True:
-            
-
-    """
         while True:
             try:
                 data = open("poker.p", "rb")
@@ -75,22 +71,22 @@ class Poker:
             else:
                 for line in data.readlines()[self.line_num:]:
                     line = PokerHandler.load_data(line)
-                    if not self.in_game:
-                        player = PokerPlayer(line[1])
-                        if line[0] == "join":
-                            if player not in self.players:
-                                print("Adding {}".format(str(player)))
-                                player.conn = Client(line[2], int(line[3]))
-                                self.players.append(player)
-                                if len(self.players) >= self.max_players:
-                                    self.in_game = True
-                        elif line[0] == "quit":
-                            print("Removing {}".format(str(player)))
-                            if player in self.players:
-                                self.players.remove(player)
-                    self.line_num += 1
+                    if len(line):
+                        if not self.in_game:
+                            player = PokerPlayer(line[1])
+                            if line[0] == "join":
+                                if player not in self.players:
+                                    player.conn = Client(line[2], int(line[3]))
+                                    self.players.append(player)
+                                    if len(self.players) >= self.max_players:
+                                        self.new_game()
+                                        self.in_game = True
+                            elif line[0] == "quit":
+                                if player in self.players:
+                                    self.players.remove(player)
+                        self.line_num += 1
+                data.close()
             time.sleep(5)
-
 
     def new_game(self):
         for i in range(2):
@@ -98,14 +94,16 @@ class Poker:
                 player.add(self.deck.pop())
         for i in range(len(self.players)):
             players = self.players[i:len(self.players)] + self.players[0:i]
-            player_data = [{"id": p.id} for p in players]
-            player_data[0].update({"cards": players[0].cards})
-            self.players[i].conn.send({"players": player_data, "timestamp": datetime.datetime.now()})
+            for position, player in enumerate(players):
+                player.conn.send("player {} {}\n".format(position, str(player)))
+            players[0].conn.send("cards {} {} {}\n".format(players[0].id,
+                                                         hash(players[0].cards[0]), hash(players[0].cards[1])))
         #self.bet(1)
         #self.players[self.player_turn].has_raised = True
         #self.bet(2)
         #self.turn()
 
+    """
     def run_lobby(self):
         while len(self.players) < self.max_players:
             conn, address = self.server.get_request()

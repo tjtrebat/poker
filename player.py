@@ -23,6 +23,9 @@ class PlayerCanvas:
         positions = ((400, 470), (75, 450), (75, 250), (75, 60), (400, 60), (725, 60), (725, 250), (725, 450),)
         return positions[self.position]
 
+    def __eq__(self, other):
+        return self.id == other.id
+
 class PlayerGUI(threading.Thread):
     def __init__(self, root):
         threading.Thread.__init__(self)
@@ -80,14 +83,16 @@ class PlayerGUI(threading.Thread):
             pass
         else:
             for line in data.readlines()[self.line_num:]:
-                if key == "players":
-                    for i, player in enumerate(value):
-                        player_canvas = self.players[i]
-                        player_canvas.id = player["id"]
-                        if not i:
-                            for j, card in enumerate(player["cards"]):
-                                player_canvas.canvas.itemconfig(player_canvas.cards[j], image=self.cards[hash(card)])
-                self.line_num += 1
+                line = PokerHandler.load_data(line)
+                if len(line):
+                    if line[0] == "player":
+                        self.players[int(line[1])].id = line[2]
+                    elif line[0] == "cards":
+                        player_canvas = self.get_player_canvas(line[1])
+                        for i, card in enumerate([line[2], line[3],]):
+                            player_canvas.canvas.itemconfig(player_canvas.cards[i], image=self.cards[int(card)])
+                    self.line_num += 1
+            data.close()
         self.root.after(5000, self.update_widgets)
 
     def get_cards(self):
@@ -97,7 +102,7 @@ class PlayerGUI(threading.Thread):
             cards[hash(card)] = PhotoImage(file=card.get_image())
         return cards
 
-    def get_player(self, id):
+    def get_player_canvas(self, id):
         player_canvas = None
         for player in self.players:
             if id == player.id:

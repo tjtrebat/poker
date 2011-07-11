@@ -20,7 +20,7 @@ class PokerHandler(asyncore.dispatcher_with_send):
 
     @classmethod
     def load_data(cls, line):
-        line = line.strip().split()
+        line = line.split()
         line = [w.decode("UTF-8") for w in line]
         return line
 
@@ -39,4 +39,7 @@ class PokerServer(asyncore.dispatcher):
         if pair is not None:
             sock, addr = pair
             print('Incoming connection from %s' % repr(addr))
-            handler = PokerHandler(self.file_name, sock)
+            self.handler = PokerHandler(self.file_name, sock)
+
+    def get_data(self):
+        return self.handler.data
